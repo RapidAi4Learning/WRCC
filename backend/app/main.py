@@ -26,9 +26,11 @@ def create_app() -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok", "env": settings.app_env}
 
+    from app.api.courses import router as courses_router
     from app.auth.router import router as auth_router
 
     app.include_router(auth_router)
+    app.include_router(courses_router)
 
     return app
 

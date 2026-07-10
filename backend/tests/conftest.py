@@ -88,3 +88,31 @@ async def client(db_sessionmaker) -> AsyncIterator[AsyncClient]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as http:
         yield http
+
+
+ADMIN_EMAIL = "admin@wrcc.local"
+ADMIN_PASSWORD = "correct-horse-battery"
+
+
+@pytest_asyncio.fixture
+async def auth_client(client: AsyncClient, db_sessionmaker) -> AsyncClient:
+    """Client with a seeded admin user and an active session cookie."""
+    from app.auth.security import hash_password
+    from app.db.models import User
+
+    async with db_sessionmaker() as session:
+        session.add(
+            User(
+                email=ADMIN_EMAIL,
+                password_hash=hash_password(ADMIN_PASSWORD),
+                display_name="Admin",
+                is_active=True,
+            )
+        )
+        await session.commit()
+
+    response = await client.post(
+        "/api/auth/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}
+    )
+    assert response.status_code == 200, response.text
+    return client
