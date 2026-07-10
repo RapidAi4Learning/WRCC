@@ -44,10 +44,13 @@ def _created_at() -> Mapped[dt.datetime]:
 
 
 def _updated_at() -> Mapped[dt.datetime]:
+    # Client-side onupdate (not func.now()): a server-side onupdate leaves the
+    # attribute expired after UPDATE, and reading it later in an async context
+    # triggers a sync lazy-load (MissingGreenlet).
     return mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
-        onupdate=func.now(),
+        onupdate=lambda: dt.datetime.now(dt.UTC),
         nullable=False,
     )
 
