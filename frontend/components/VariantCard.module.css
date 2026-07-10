@@ -1,0 +1,133 @@
+.card {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-raised);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.card[data-status="approved"] {
+  border-color: var(--color-accent);
+}
+
+.card[data-status="archived"] {
+  opacity: 0.65;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.style {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-right: auto;
+}
+
+.body {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: var(--text-sm);
+}
+
+.hashtags {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-accent);
+  word-break: break-word;
+}
+
+.cta {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent-strong);
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.action,
+.primary {
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.action {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.action:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.action:disabled,
+.primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.primary {
+  border: none;
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--color-accent-strong);
+}
+
+.editArea {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  resize: vertical;
+}
+
+.editActions {
+  display: flex;
+  gap: var(--space-2);
+}

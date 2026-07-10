@@ -1,0 +1,19 @@
+import { expect, test } from "@playwright/test";
+
+test("login page renders", async ({ page }) => {
+  await page.goto("/login");
+  await expect(page.locator("h1")).toHaveText("Content Studio");
+  await expect(page.getByLabel("Email")).toBeVisible();
+  await expect(page.getByLabel("Password")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+});
+
+test("unauthenticated visitor is redirected to login", async ({ page }) => {
+  await page.goto("/generate");
+  await expect(page).toHaveURL(/\/login\?next=%2Fgenerate/);
+});
+
+test("root redirects to login when signed out", async ({ page }) => {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/login/);
+});
