@@ -204,7 +204,7 @@ class GeminiLLMClient:
                         "response_schema": SocialPostDraft,
                     },
                 )
-                return SocialPostDraft.model_validate_json(response.text)
+                return SocialPostDraft.model_validate_json(response.text or "")
             except (ValidationError, Exception) as exc:  # noqa: BLE001
                 last_error = exc
                 logger.warning(

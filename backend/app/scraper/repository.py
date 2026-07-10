@@ -81,22 +81,22 @@ class CatalogRepository:
                 offerings_by_code[new_offering.offering_code] = new_offering
 
         for updated in changeset.get("courses_updated", []):
-            course = courses_by_code.get(updated["course_code"])
-            if course is None:
+            updated_course = courses_by_code.get(updated["course_code"])
+            if updated_course is None:
                 continue
             for field, change in updated["changes"].items():
-                setattr(course, field, change["to"])
+                setattr(updated_course, field, change["to"])
 
         for code in changeset.get("courses_removed", []):
-            course = courses_by_code.get(code)
-            if course is not None:
-                course.is_active = False
+            removed_course = courses_by_code.get(code)
+            if removed_course is not None:
+                removed_course.is_active = False
 
         for added in changeset.get("offerings_added", []):
-            course = courses_by_code.get(added["course_code"])
-            if course is None:
+            parent_course = courses_by_code.get(added["course_code"])
+            if parent_course is None:
                 continue
-            new_offering = self._build_offering(course.id, added)
+            new_offering = self._build_offering(parent_course.id, added)
             self._session.add(new_offering)
             offerings_by_code[new_offering.offering_code] = new_offering
 

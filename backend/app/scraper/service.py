@@ -19,7 +19,7 @@ from app.scraper.fetcher import FetchError, PoliteFetcher
 from app.scraper.normalize import build_course_groups
 from app.scraper.parser import parse_course_detail
 from app.scraper.repository import CatalogRepository, ScraperRunRepository
-from app.scraper.types import ScrapedCourseGroup
+from app.scraper.types import ScrapedCourseCard, ScrapedCourseGroup, ScrapedOffering
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +32,8 @@ class SyncConflictError(RuntimeError):
 
 async def crawl_catalog(settings: Settings) -> list[ScrapedCourseGroup]:
     """Crawl every category page, then each course detail page (deduplicated)."""
-    entries = []
-    detail_cache: dict[str, tuple[str | None, list]] = {}
+    entries: list[tuple[ScrapedCourseCard, str | None, list[ScrapedOffering]]] = []
+    detail_cache: dict[str, tuple[str | None, list[ScrapedOffering]]] = {}
 
     async with PoliteFetcher(settings) as fetcher:
         for category, url in category_urls(settings.scraper_base_url).items():
