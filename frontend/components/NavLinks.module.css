@@ -1,0 +1,30 @@
+.nav {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.link,
+.active {
+  text-decoration: none;
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.link {
+  color: var(--color-text-muted);
+}
+
+.link:hover {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.active {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-soft);
+  font-weight: 600;
+}
