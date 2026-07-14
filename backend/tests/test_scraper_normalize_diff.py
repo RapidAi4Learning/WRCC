@@ -51,6 +51,17 @@ def test_groups_dedup_offerings_and_prefer_detail_description() -> None:
     assert any("Fitness" in warning for warning in group.warnings)
 
 
+def test_group_title_strips_leading_course_code() -> None:
+    card = ScrapedCourseCard(
+        course_code="HLTAID009",
+        title="HLTAID009 Provide Cardio Pulmonary Resuscitation ONLINE LEARNING",
+        category="First Aid",
+        detail_url="https://wrcc.nsw.edu.au/course-details/?course_id=5&course_type=w",
+    )
+    groups = build_course_groups([(card, None, [_offering("111")])])
+    assert groups[0].title == "Provide Cardio Pulmonary Resuscitation ONLINE LEARNING"
+
+
 def test_group_without_offerings_gets_synthetic_on_demand() -> None:
     card = ScrapedCourseCard(
         course_code="online-only",

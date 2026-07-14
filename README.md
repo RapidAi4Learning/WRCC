@@ -21,7 +21,7 @@ Social content generation + course catalog studio for
 |---|---|
 | Backend | Python 3.11+, FastAPI, SQLAlchemy 2 async + asyncpg, Alembic |
 | DB | PostgreSQL (aiosqlite in unit tests) |
-| LLM | `google-genai` (Gemini) behind an `LLMClient` protocol with a deterministic mock (`LLM_MOCK=true` by default) |
+| LLM | `google-genai` (Gemini) or `openai` (GPT) behind an `LLMClient` protocol with a deterministic mock (`LLM_MOCK=true` by default; provider via `LLM_PROVIDER`) |
 | Scraper | httpx (politeness delay + bounded retries) + BeautifulSoup |
 | Frontend | Next.js 14, React 18, TypeScript, CSS modules |
 | Tests | pytest + pytest-asyncio (103 tests, HTML fixtures); vitest + Playwright |
@@ -69,7 +69,9 @@ Point the frontend at a non-default API host with
 See [`backend/.env.example`](backend/.env.example). Highlights:
 
 - **Mock-first (D3)**: the app boots with zero credentials. `LLM_MOCK=false`
-  requires `GEMINI_API_KEY` (validated at startup, fail-fast).
+  requires the API key of the selected `LLM_PROVIDER` — `GEMINI_API_KEY` for
+  `gemini` (default) or `OPENAI_API_KEY` for `openai` (validated at startup,
+  fail-fast).
 - **No hardcoded secrets**: the admin seed reads `ADMIN_EMAIL` /
   `ADMIN_PASSWORD` and refuses to run without them; production rejects the
   `AUTH_SECRET` placeholder.
@@ -84,7 +86,7 @@ backend/app/
 ├── services/    courses.py — HITL review (approve applies the changeset)
 ├── agents/      content_generator (PLATFORM_PROFILES, 3 variant styles),
 │                validation (deterministic ranking baseline)
-├── llm/         LLMClient protocol · MockLLMClient · GeminiLLMClient
+├── llm/         LLMClient protocol · MockLLMClient · GeminiLLMClient · OpenAILLMClient
 ├── content/     schemas · state machine · repository · services (generate + workflow)
 └── api/         routers: content, courses (+ sync), auth, health
 ```

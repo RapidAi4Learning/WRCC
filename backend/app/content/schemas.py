@@ -70,3 +70,20 @@ class GenerateContentResponse(BaseModel):
     generation_group: str
     items: list[ContentItemOut]
     warnings: list[str] = Field(default_factory=list)
+
+
+class GenerateImageRequest(BaseModel):
+    prompt: str = Field(min_length=3, max_length=2000)
+
+
+class ContentImageOut(BaseModel):
+    id: str
+    content_item_id: str
+    prompt: str
+    model: str
+    created_at: dt.datetime
+    file_url: str  # relative API path; the client prefixes its API base
+
+
+class ImageSuggestionsResponse(BaseModel):
+    prompts: list[str]

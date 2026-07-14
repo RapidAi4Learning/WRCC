@@ -8,6 +8,7 @@ from app.scraper.types import (
     ScrapedOffering,
     course_id_from_url,
     is_accredited_code,
+    strip_leading_course_code,
 )
 
 ON_DEMAND_PREFIX = "on-demand:"
@@ -31,7 +32,7 @@ def build_course_groups(
         if group is None:
             group = ScrapedCourseGroup(
                 course_code=card.course_code,
-                title=card.title,
+                title=strip_leading_course_code(card.title),
                 category=card.category,
                 description=detail_description or card.description,
                 is_accredited=is_accredited_code(card.course_code),

@@ -26,6 +26,7 @@ export default function GeneratePage() {
   const [notes, setNotes] = useState("");
   const [platforms, setPlatforms] = useState<Platform[]>(["facebook"]);
   const [result, setResult] = useState<GenerateContentResult | null>(null);
+  const [activePlatform, setActivePlatform] = useState<Platform | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -54,6 +55,7 @@ export default function GeneratePage() {
         platforms,
       });
       setResult(generated);
+      setActivePlatform(generated.items[0]?.platform ?? null);
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : "Generation failed. Try again.",
@@ -83,6 +85,14 @@ export default function GeneratePage() {
       item,
     ]);
   }
+  const resultPlatforms = ALL_PLATFORMS.filter((platform) =>
+    itemsByPlatform.has(platform),
+  );
+  // Guard against a stale tab (e.g. platform deselected on the next run).
+  const shownPlatform =
+    activePlatform && itemsByPlatform.has(activePlatform)
+      ? activePlatform
+      : resultPlatforms[0] ?? null;
 
   return (
     <div className={styles.page}>
@@ -94,6 +104,7 @@ export default function GeneratePage() {
         </p>
       </header>
 
+      <div className={styles.workspace}>
       <form className={styles.form} onSubmit={handleSubmit}>
         <fieldset className={styles.fieldset}>
           <legend className={styles.legend}>1 · Ground it</legend>
@@ -167,33 +178,67 @@ export default function GeneratePage() {
         </button>
       </form>
 
-      {result ? (
-        <section className={styles.results} aria-label="Generated variants">
-          {result.warnings.map((warning) => (
-            <p key={warning} className={styles.warning}>
-              ⚠ {warning}
-            </p>
-          ))}
-          {ALL_PLATFORMS.filter((platform) => itemsByPlatform.has(platform)).map(
-            (platform) => (
-              <div key={platform} className={styles.platformGroup}>
-                <h2 className={styles.platformHeading}>
-                  <PlatformBadge platform={platform} />
-                </h2>
-                <div className={styles.cards}>
-                  {itemsByPlatform.get(platform)!.map((item) => (
-                    <VariantCard
-                      key={item.id}
-                      item={item}
-                      onChange={handleItemChange}
-                    />
-                  ))}
-                </div>
+      <section className={styles.results} aria-label="Generated variants">
+        {result ? (
+          <>
+            {result.warnings.map((warning) => (
+              <p key={warning} className={styles.warning}>
+                ⚠ {warning}
+              </p>
+            ))}
+
+            {resultPlatforms.length > 1 ? (
+              <div className={styles.tabs} role="tablist" aria-label="Platform">
+                {resultPlatforms.map((platform) => (
+                  <button
+                    key={platform}
+                    type="button"
+                    role="tab"
+                    aria-selected={platform === shownPlatform}
+                    className={
+                      platform === shownPlatform ? styles.tabActive : styles.tab
+                    }
+                    onClick={() => setActivePlatform(platform)}
+                  >
+                    <PlatformBadge platform={platform} />
+                    <span className={styles.tabCount}>
+                      {itemsByPlatform.get(platform)!.length}
+                    </span>
+                  </button>
+                ))}
               </div>
-            ),
-          )}
-        </section>
-      ) : null}
+            ) : null}
+
+            {shownPlatform ? (
+              <div
+                key={shownPlatform}
+                role={resultPlatforms.length > 1 ? "tabpanel" : undefined}
+                className={styles.cards}
+              >
+                {itemsByPlatform.get(shownPlatform)!.map((item) => (
+                  <VariantCard
+                    key={item.id}
+                    item={item}
+                    onChange={handleItemChange}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className={styles.empty} aria-hidden="true">
+            <p className={styles.emptyTitle}>
+              {isGenerating ? "Generating ideas…" : "Your ideas land here"}
+            </p>
+            <p className={styles.emptyHint}>
+              {isGenerating
+                ? "The AI is drafting three variants per platform."
+                : "Fill in the left panel and generate — results appear side by side, no scrolling."}
+            </p>
+          </div>
+        )}
+      </section>
+      </div>
     </div>
   );
 }

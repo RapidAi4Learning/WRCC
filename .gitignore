@@ -21,3 +21,6 @@ playwright-report/
 .env
 .env.local
 *.log
+
+# Generated post images (served from MEDIA_DIR)
+media/

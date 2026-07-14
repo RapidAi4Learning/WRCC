@@ -160,7 +160,7 @@ class ContentGenerationService:
                                 "model": (
                                     "mock"
                                     if self._settings.llm_mock
-                                    else self._settings.gemini_model
+                                    else self._settings.live_model_name
                                 ),
                                 "generated_at": generated_at,
                                 "violation_count": draft.violation_count,
@@ -375,7 +375,7 @@ class ContentWorkflowService:
             status=ContentStatus.draft,
             ai_metadata={
                 "mock": self._settings.llm_mock,
-                "model": "mock" if self._settings.llm_mock else self._settings.gemini_model,
+                "model": "mock" if self._settings.llm_mock else self._settings.live_model_name,
                 "generated_at": dt.datetime.now(dt.UTC).isoformat(),
                 "violation_count": draft.violation_count,
                 "context": draft.context,

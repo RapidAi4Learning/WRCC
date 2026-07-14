@@ -16,15 +16,41 @@
   max-width: 46rem;
 }
 
+/* Two-pane workspace: compact compose form on the left, results on the
+   right — generating never pushes the output below the fold. */
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(19rem, 23rem) 1fr;
+  gap: var(--space-6);
+  align-items: start;
+}
+
 .form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-5);
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-6);
+  padding: var(--space-5);
   box-shadow: var(--shadow-raised);
+  /* Stays alongside the results while they scroll (below the app header). */
+  position: sticky;
+  top: 4.5rem;
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
+}
+
+@media (max-width: 64rem) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .form {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+  }
 }
 
 .fieldset {
@@ -49,7 +75,7 @@
 .label {
   font-size: var(--text-sm);
   font-weight: 600;
-  margin-top: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 .optional {
@@ -79,20 +105,30 @@
 
 .platforms {
   display: flex;
-  gap: var(--space-4);
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
+/* Toggle chips: the pill itself shows the checked state, so the three
+   platforms fit on one row inside the narrow compose column. */
 .platformOption {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  justify-content: center;
   cursor: pointer;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
-  transition: border-color var(--duration-fast) var(--ease-out);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.platformOption input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .platformOption:hover {
@@ -102,6 +138,11 @@
 .platformOption:has(input:checked) {
   border-color: var(--color-accent);
   background: var(--color-accent-soft);
+}
+
+.platformOption:has(input:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .error {
@@ -147,22 +188,75 @@
 .results {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-4);
+  min-width: 0; /* let the grid column shrink instead of overflowing */
 }
 
-.platformGroup {
+.tabs {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
-.platformHeading {
-  margin: 0;
+.tab,
+.tabActive {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.tab:hover {
+  border-color: var(--color-accent);
+}
+
+.tabActive {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.tabCount {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-text-muted);
 }
 
 .cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
   gap: var(--space-4);
   align-items: start;
+}
+
+.empty {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-12) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+  min-height: 16rem;
+  justify-content: center;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.emptyHint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  max-width: 24rem;
 }

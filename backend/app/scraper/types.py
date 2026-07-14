@@ -15,6 +15,10 @@ _PRICE_RE = re.compile(r"[-+]?\d[\d,]*\.?\d*")
 # National training codes: HLTAID011, TLILIC0003, SITHFAB021… (unit codes use
 # 3–10 uppercase letters — e.g. the 7-letter SITHFAB prefix — then 3–5 digits).
 _ACCREDITED_CODE_RE = re.compile(r"^[A-Z]{3,10}\d{3,5}")
+# A code at the start of a course title, e.g. "HLTAID009 Provide CPR" or the
+# suffixed site variant "HLTAID012OL …". Requires a separator after the code so
+# a code-only title is left untouched.
+_LEADING_CODE_RE = re.compile(r"^[A-Z]{3,10}\d{3,5}[A-Z]{0,4}[\s:–-]+")
 # "24 July 2026" or a range "28 - 30 September 2026" /
 # "30 September - 2 October 2026" (month optional on the start side).
 _DATE_RANGE_RE = re.compile(
@@ -136,6 +140,18 @@ def course_id_from_url(url: str | None) -> str | None:
 def is_accredited_code(code: str) -> bool:
     """Derived from the national code pattern (HLTAID011, TLILIC0003, …)."""
     return bool(_ACCREDITED_CODE_RE.match(code.strip()))
+
+
+def strip_leading_course_code(title: str) -> str:
+    """'HLTAID009 Provide CPR' → 'Provide CPR'.
+
+    The site prefixes accredited course names with the national code, which is
+    already stored separately as ``course_code``. Falls back to the original
+    title when stripping would leave nothing.
+    """
+    text = title.strip()
+    stripped = _LEADING_CODE_RE.sub("", text).strip()
+    return stripped or text
 
 
 @dataclass(slots=True)

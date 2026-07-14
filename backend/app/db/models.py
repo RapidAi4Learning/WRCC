@@ -186,3 +186,25 @@ class ContentItem(Base):
     reviewed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[dt.datetime] = _created_at()
     updated_at: Mapped[dt.datetime] = _updated_at()
+
+
+class ContentImage(Base):
+    """Generated post image: prompt + stored file, kept as per-post history."""
+
+    __tablename__ = "content_images"
+    __table_args__ = (
+        Index("ix_content_images_item_created", "content_item_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    content_item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("content_items.id", ondelete="CASCADE"), nullable=False
+    )
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    model: Mapped[str] = mapped_column(Text, nullable=False)
+    # Relative to the media root (uuid-based name, never user input).
+    file_path: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[dt.datetime] = _created_at()

@@ -3,10 +3,12 @@
 
 import type { AuthUser, LoginCredentials } from "@/types/auth";
 import type {
+  ContentImage,
   ContentItem,
   ContentStatus,
   GenerateContentInput,
   GenerateContentResult,
+  ImageSuggestions,
   Platform,
   WorkflowAction,
 } from "@/types/content";
@@ -14,7 +16,8 @@ import type { Course, CourseDetail, SyncRun } from "@/types/course";
 
 // Strip any trailing slash so `${API_BASE}/api/...` can't produce a double
 // slash. Lets the env var be set with or without a trailing slash safely.
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000").replace(
+// Exported so <img>/<a> tags can reference backend-served files directly.
+export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000").replace(
   /\/+$/,
   "",
 );
@@ -105,6 +108,32 @@ export function editContent(itemId: string, body: string): Promise<ContentItem> 
     method: "PUT",
     body: JSON.stringify({ body }),
   });
+}
+
+// ── Post images ──
+
+export function fetchImageSuggestions(itemId: string): Promise<ImageSuggestions> {
+  return request<ImageSuggestions>(`/api/content/${itemId}/images/suggestions`, {
+    method: "POST",
+  });
+}
+
+export function generateImage(
+  itemId: string,
+  prompt: string,
+): Promise<ContentImage> {
+  return request<ContentImage>(`/api/content/${itemId}/images`, {
+    method: "POST",
+    body: JSON.stringify({ prompt }),
+  });
+}
+
+export function fetchImages(itemId: string): Promise<ContentImage[]> {
+  return request<ContentImage[]>(`/api/content/${itemId}/images`);
+}
+
+export function imageFileUrl(image: ContentImage, download = false): string {
+  return `${API_BASE}${image.file_url}${download ? "?download=true" : ""}`;
 }
 
 // ── Catalog ──

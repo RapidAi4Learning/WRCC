@@ -8,6 +8,7 @@ import { useState } from "react";
 import { ApiError, contentAction, editContent } from "@/lib/api";
 import type { ContentItem, WorkflowAction } from "@/types/content";
 import { PlatformBadge, StatusBadge } from "@/components/Badges";
+import ImagePanel from "@/components/ImagePanel";
 import styles from "./VariantCard.module.css";
 
 const STYLE_LABELS: Record<string, string> = {
@@ -188,6 +189,8 @@ export default function VariantCard({
             </button>
           ))}
       </footer>
+
+      <ImagePanel itemId={item.id} />
     </article>
   );
 }

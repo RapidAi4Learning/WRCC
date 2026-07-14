@@ -42,6 +42,19 @@ export interface GenerateContentResult {
   warnings: string[];
 }
 
+export interface ContentImage {
+  id: string;
+  content_item_id: string;
+  prompt: string;
+  model: string;
+  created_at: string;
+  file_url: string;
+}
+
+export interface ImageSuggestions {
+  prompts: string[];
+}
+
 export type WorkflowAction =
   | "submit"
   | "approve"

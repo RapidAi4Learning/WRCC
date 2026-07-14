@@ -68,7 +68,7 @@ async def db_session(db_sessionmaker) -> AsyncIterator[AsyncSession]:
 
 
 @pytest_asyncio.fixture
-async def client(db_sessionmaker) -> AsyncIterator[AsyncClient]:
+async def client(db_sessionmaker, tmp_path: Path) -> AsyncIterator[AsyncClient]:
     """App-level HTTP client wired to the in-memory test database."""
     app = create_app()
 
@@ -83,7 +83,9 @@ async def client(db_sessionmaker) -> AsyncIterator[AsyncClient]:
 
     app.dependency_overrides[get_session] = _test_session
     # Zero-arg closure: FastAPI would otherwise map **kwargs to a query param.
-    app.dependency_overrides[get_settings] = lambda: make_settings()
+    # media_dir under tmp_path keeps generated image files out of the repo.
+    media_dir = str(tmp_path / "media")
+    app.dependency_overrides[get_settings] = lambda: make_settings(media_dir=media_dir)
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as http:

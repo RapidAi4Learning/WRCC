@@ -76,8 +76,24 @@ class Settings(BaseSettings):
 
     # ── LLM (mock-first, D3) ──
     llm_mock: bool = True
+    llm_provider: Literal["gemini", "openai"] = "gemini"
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
+    openai_api_key: str = ""
+    openai_model: str = "gpt-5-mini"
+
+    @property
+    def live_model_name(self) -> str:
+        """Model recorded in ai_metadata when LLM_MOCK=false."""
+        if self.llm_provider == "openai":
+            return self.openai_model
+        return self.gemini_model
+
+    # ── Images (mock-first: follows LLM_MOCK; live requires LLM_PROVIDER=openai) ──
+    image_model: str = "gpt-image-1"
+    image_size: str = "1024x1024"
+    image_quality: Literal["low", "medium", "high", "auto"] = "medium"
+    media_dir: str = "media"
 
     # ── Scraper (politeness + bounded retries) ──
     scraper_base_url: str = "https://wrcc.nsw.edu.au"
@@ -95,8 +111,15 @@ class Settings(BaseSettings):
         """Enforce that live mode supplies the secrets it needs."""
         missing: list[str] = []
 
-        if not self.llm_mock and not self.gemini_api_key:
-            missing.append("GEMINI_API_KEY (required when LLM_MOCK=false)")
+        if not self.llm_mock:
+            if self.llm_provider == "gemini" and not self.gemini_api_key:
+                missing.append(
+                    "GEMINI_API_KEY (required when LLM_MOCK=false and LLM_PROVIDER=gemini)"
+                )
+            if self.llm_provider == "openai" and not self.openai_api_key:
+                missing.append(
+                    "OPENAI_API_KEY (required when LLM_MOCK=false and LLM_PROVIDER=openai)"
+                )
 
         if self.app_env == "production":
             if self.auth_secret == _AUTH_SECRET_PLACEHOLDER:

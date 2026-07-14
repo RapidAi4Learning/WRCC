@@ -12,6 +12,7 @@ from app.scraper.types import (
     parse_date_range,
     parse_places,
     parse_price,
+    strip_leading_course_code,
 )
 
 
@@ -77,3 +78,31 @@ def test_instance_id_from_url() -> None:
 )
 def test_is_accredited_code(code: str, expected: bool) -> None:
     assert is_accredited_code(code) is expected
+
+
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        (
+            "HLTAID009 Provide Cardio Pulmonary Resuscitation ONLINE LEARNING",
+            "Provide Cardio Pulmonary Resuscitation ONLINE LEARNING",
+        ),
+        (
+            "HLTAID012 Provide First Aid in an education and care setting ONLINE LEARNING",
+            "Provide First Aid in an education and care setting ONLINE LEARNING",
+        ),
+        ("TLILIC0003 Licence to operate a forklift truck", "Licence to operate a forklift truck"),
+        # Suffixed site codes (HLTAID012OL) are stripped too.
+        ("HLTAID012OL Provide First Aid", "Provide First Aid"),
+        # Dash/colon separators after the code.
+        ("HLTAID009 - Provide CPR", "Provide CPR"),
+        # Non-accredited titles pass through untouched.
+        ("Barista Basics", "Barista Basics"),
+        ("Yoga for Beginners", "Yoga for Beginners"),
+        # A title that is only a code never degrades to an empty string.
+        ("HLTAID009", "HLTAID009"),
+        ("  HLTAID011 Provide First Aid  ", "Provide First Aid"),
+    ],
+)
+def test_strip_leading_course_code(title: str, expected: str) -> None:
+    assert strip_leading_course_code(title) == expected

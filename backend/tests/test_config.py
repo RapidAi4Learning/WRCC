@@ -40,6 +40,28 @@ def test_live_llm_requires_gemini_key() -> None:
     assert settings.gemini_api_key == "real-key"
 
 
+def test_live_llm_requires_openai_key_for_openai_provider() -> None:
+    with pytest.raises(ValueError, match="OPENAI_API_KEY"):
+        make_settings(llm_mock=False, llm_provider="openai", openai_api_key="")
+    settings = make_settings(
+        llm_mock=False, llm_provider="openai", openai_api_key="real-key"
+    )
+    assert settings.openai_api_key == "real-key"
+    # The gemini key is not required when the openai provider is selected.
+    assert settings.gemini_api_key == ""
+
+
+def test_llm_provider_rejects_unknown_value() -> None:
+    with pytest.raises(ValueError):
+        make_settings(llm_provider="mistral")
+
+
+def test_live_model_name_follows_provider() -> None:
+    assert make_settings().live_model_name == make_settings().gemini_model
+    settings = make_settings(llm_provider="openai", openai_model="gpt-5-mini")
+    assert settings.live_model_name == "gpt-5-mini"
+
+
 def test_production_rejects_placeholder_auth_secret() -> None:
     with pytest.raises(ValueError, match="AUTH_SECRET"):
         make_settings(app_env="production", auth_secret="change-me-32-bytes-min")
