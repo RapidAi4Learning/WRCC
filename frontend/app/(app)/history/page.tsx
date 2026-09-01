@@ -24,6 +24,7 @@ const STATUS_OPTIONS: Array<{ value: ContentStatus | ""; label: string }> = [
   { value: "pending_approval", label: "Pending approval" },
   { value: "approved", label: "Approved" },
   { value: "rejected", label: "Rejected" },
+  { value: "published", label: "Published" },
   { value: "archived", label: "Archived" },
 ];
 

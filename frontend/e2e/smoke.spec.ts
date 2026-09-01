@@ -17,3 +17,10 @@ test("root redirects to login when signed out", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/login/);
 });
+
+test("settings is behind the login wall", async ({ page }) => {
+  // The connections page lists which accounts posts publish to; it must not be
+  // reachable without a session.
+  await page.goto("/settings");
+  await expect(page).toHaveURL(/\/login\?next=%2Fsettings/);
+});

@@ -1,14 +1,12 @@
 """Post-image service: LLM prompt suggestions, generation, per-post history.
 
-Files land under ``<media_dir>/content_images/<uuid>.png`` (uuid-named, never
-derived from user input); the DB row stores the media-relative path so the
-media root can move without a data migration.
+PNG bytes are stored on the ``content_images`` row itself, so images share
+the database's persistence and backups — no volume or object store needed.
 """
 
 from __future__ import annotations
 
 import uuid
-from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,15 +18,9 @@ from app.db.models import ContentImage, ContentItem, Course
 from app.llm.client import LLMClient
 from app.llm.images import get_image_client
 
-_IMAGES_SUBDIR = "content_images"
-
 
 class ContentImageNotFoundError(LookupError):
     """Raised when an image id does not exist."""
-
-
-def media_root(settings: Settings) -> Path:
-    return Path(settings.media_dir).expanduser().resolve()
 
 
 class ContentImageService:
@@ -73,18 +65,12 @@ class ContentImageService:
         client = get_image_client(self._settings)
         png = await client.generate_image(prompt)
 
-        image_id = uuid.uuid4()
-        relative_path = f"{_IMAGES_SUBDIR}/{image_id}.png"
-        target = media_root(self._settings) / _IMAGES_SUBDIR / f"{image_id}.png"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(png)
-
         image = ContentImage(
-            id=image_id,
+            id=uuid.uuid4(),
             content_item_id=item.id,
             prompt=prompt,
             model="mock" if self._settings.llm_mock else self._settings.image_model,
-            file_path=relative_path,
+            data=png,
             created_by=actor_id,
         )
         self._session.add(image)
@@ -93,7 +79,7 @@ class ContentImageService:
             actor_id=actor_id,
             action="content_image.generate",
             entity_type="content_image",
-            entity_id=image_id,
+            entity_id=image.id,
             payload_diff={"content_item_id": str(item.id), "prompt": prompt},
         )
         await self._session.flush()
@@ -113,13 +99,3 @@ class ContentImageService:
         if image is None:
             raise ContentImageNotFoundError(f"Image {image_id} not found.")
         return image
-
-    def image_file(self, image: ContentImage) -> Path:
-        """Resolve the stored relative path safely under the media root."""
-        root = media_root(self._settings)
-        path = (root / image.file_path).resolve()
-        if not path.is_relative_to(root):
-            raise ContentImageNotFoundError("Image file path is invalid.")
-        if not path.is_file():
-            raise ContentImageNotFoundError("Image file is missing from storage.")
-        return path

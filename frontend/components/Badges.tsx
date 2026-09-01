@@ -1,7 +1,9 @@
 import type { ContentStatus, Platform } from "@/types/content";
 import styles from "./Badges.module.css";
 
-const PLATFORM_LABELS: Record<Platform, string> = {
+// Exported so prose elsewhere ("Publish to LinkedIn") names a network exactly
+// the way its badge does.
+export const PLATFORM_LABELS: Record<Platform, string> = {
   facebook: "Facebook",
   instagram: "Instagram",
   linkedin: "LinkedIn",
@@ -12,6 +14,7 @@ const STATUS_LABELS: Record<ContentStatus, string> = {
   pending_approval: "Pending approval",
   approved: "Approved",
   rejected: "Rejected",
+  published: "Published",
   archived: "Archived",
 };
 

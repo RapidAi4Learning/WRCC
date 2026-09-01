@@ -5,6 +5,9 @@ export type ContentStatus =
   | "pending_approval"
   | "approved"
   | "rejected"
+  // Live on the network. Distinct from "approved", which only means ready to
+  // go — confusing the two is how a post gets published twice.
+  | "published"
   | "archived";
 
 export interface ContentItem {

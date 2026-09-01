@@ -46,6 +46,13 @@
   background: var(--color-danger-soft);
 }
 
+/* Deliberately louder than .approved: "ready to go" and "already gone" being
+   confusable is what causes a post to be published twice. */
+.published {
+  color: #fff;
+  background: var(--color-accent);
+}
+
 .archived {
   color: var(--color-text-muted);
   background: var(--color-surface-sunken);

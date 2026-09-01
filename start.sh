@@ -52,7 +52,9 @@ free_port() {
     done
   fi
   # Give the OS a beat to release the socket before rebinding.
-  [ -n "$pids" ] && sleep 1
+  if [ -n "$pids" ]; then
+    sleep 1
+  fi
 }
 
 free_port 8000

@@ -17,17 +17,25 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     Text,
+    UniqueConstraint,
     Uuid,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
 from app.db.base import Base
-from app.db.enums import ContentPlatform, ContentStatus, ScraperRunStatus
+from app.db.enums import (
+    ContentPlatform,
+    ContentStatus,
+    PublishStatus,
+    ScraperRunStatus,
+)
 
 # JSONB on Postgres, plain JSON elsewhere (SQLite test runs).
 PortableJSON = JSON().with_variant(JSONB(), "postgresql")
@@ -188,8 +196,107 @@ class ContentItem(Base):
     updated_at: Mapped[dt.datetime] = _updated_at()
 
 
+class SocialAccount(Base):
+    """A connected publishing destination (Page / IG account / LI organization).
+
+    Access tokens are stored as Fernet ciphertext and are never serialized by
+    any response model — see ``app.publishing.schemas``, where the token fields
+    are structurally absent rather than merely excluded.
+    """
+
+    __tablename__ = "social_accounts"
+    __table_args__ = (
+        UniqueConstraint("platform", "external_id", name="uq_social_accounts_platform_external"),
+        # At most one destination per network is the publish target. Enforced by
+        # the database so a concurrent activate cannot produce two live targets.
+        Index(
+            "uq_social_accounts_active_platform",
+            "platform",
+            unique=True,
+            sqlite_where=text("is_active = 1"),
+            postgresql_where=text("is_active"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    platform: Mapped[ContentPlatform] = mapped_column(nullable=False)
+    # Page id, Instagram user id, or LinkedIn organization id.
+    external_id: Mapped[str] = mapped_column(Text, nullable=False)
+    display_name: Mapped[str] = mapped_column(Text, nullable=False)
+    handle: Mapped[str | None] = mapped_column(Text)
+    access_token_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    # LinkedIn only — Meta's model has no refresh token (Page tokens are long-lived).
+    refresh_token_encrypted: Mapped[str | None] = mapped_column(Text)
+    token_expires_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    scopes: Mapped[list | None] = mapped_column(PortableJSON)
+    # Platform-specific extras: IG's parent page_id, LinkedIn's author URN.
+    account_metadata: Mapped[dict | None] = mapped_column(PortableJSON)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    connected_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[dt.datetime] = _created_at()
+    updated_at: Mapped[dt.datetime] = _updated_at()
+
+
+class ContentPublication(Base):
+    """One publish *attempt* against one social account.
+
+    Modelled as an attempt rather than a state so retries and failures stay
+    inspectable, and so a scheduler can later reuse the same table unchanged.
+    """
+
+    __tablename__ = "content_publications"
+    __table_args__ = (
+        Index("ix_content_publications_item_created", "content_item_id", "created_at"),
+        # A post goes out once. The application checks this too, but only the
+        # index survives a race between two concurrent requests.
+        #
+        # It covers `pending` as well as `succeeded` for a reason worth keeping:
+        # guarding only `succeeded` would let two requests both pass the
+        # application check, both insert a `pending` row, and both reach the
+        # network — two real posts — with the index merely stopping the *second*
+        # from being recorded. Blocking a second `pending` stops the duplicate
+        # before it is sent, which is the only point at which it can be stopped.
+        # A `failed` attempt leaves the set, so a retry is free to start.
+        Index(
+            "uq_content_publications_in_flight",
+            "content_item_id",
+            unique=True,
+            sqlite_where=text("status IN ('pending', 'succeeded')"),
+            postgresql_where=text("status IN ('pending', 'succeeded')"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    content_item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("content_items.id", ondelete="CASCADE"), nullable=False
+    )
+    # SET NULL: the record of what went out must survive a disconnect.
+    social_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("social_accounts.id", ondelete="SET NULL")
+    )
+    content_image_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("content_images.id", ondelete="SET NULL")
+    )
+    status: Mapped[PublishStatus] = mapped_column(
+        default=PublishStatus.pending, nullable=False
+    )
+    external_post_id: Mapped[str | None] = mapped_column(Text)
+    permalink: Mapped[str | None] = mapped_column(Text)
+    # Counts and ids only — never tokens, never the full payload.
+    request_summary: Mapped[dict | None] = mapped_column(PortableJSON)
+    error: Mapped[str | None] = mapped_column(Text)
+    error_code: Mapped[str | None] = mapped_column(Text)
+    attempted_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[dt.datetime] = _created_at()
+    completed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class ContentImage(Base):
-    """Generated post image: prompt + stored file, kept as per-post history."""
+    """Generated post image: prompt + PNG bytes, kept as per-post history."""
 
     __tablename__ = "content_images"
     __table_args__ = (
@@ -202,8 +309,9 @@ class ContentImage(Base):
     )
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     model: Mapped[str] = mapped_column(Text, nullable=False)
-    # Relative to the media root (uuid-based name, never user input).
-    file_path: Mapped[str] = mapped_column(Text, nullable=False)
+    # PNG bytes live in the DB so images survive redeploys with no volume
+    # or object store (~1-2 MB each at this tool's volume).
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )

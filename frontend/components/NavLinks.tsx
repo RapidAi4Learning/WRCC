@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/generate", label: "Generate" },
   { href: "/history", label: "History" },
   { href: "/catalog", label: "Catalog" },
+  { href: "/settings", label: "Settings" },
 ];
 
 export default function NavLinks() {

@@ -35,11 +35,19 @@ def reset_rate_limiter() -> None:
     get_rate_limiter().reset()
 
 
+# A fixed Fernet key so encryption round-trips are deterministic in tests.
+# urlsafe-base64 of b"wrcc-test-token-key-32-bytes!!!!" (exactly 32 bytes).
+TEST_TOKEN_KEY = "d3JjYy10ZXN0LXRva2VuLWtleS0zMi1ieXRlcyEhISE="
+
+
 def make_settings(**overrides) -> Settings:
     """Deterministic settings decoupled from any local .env file."""
     defaults: dict = {
         "_env_file": None,
         "auth_secret": "test-secret-key-at-least-32-bytes-long",
+        "token_encryption_key": TEST_TOKEN_KEY,
+        "media_signing_secret": "test-media-signing-secret",
+        "public_api_base_url": "https://api.test",
     }
     defaults.update(overrides)
     return Settings(**defaults)  # type: ignore[arg-type]
@@ -67,10 +75,14 @@ async def db_session(db_sessionmaker) -> AsyncIterator[AsyncSession]:
         yield session
 
 
-@pytest_asyncio.fixture
-async def client(db_sessionmaker, tmp_path: Path) -> AsyncIterator[AsyncClient]:
-    """App-level HTTP client wired to the in-memory test database."""
-    app = create_app()
+@pytest.fixture
+def app(db_sessionmaker):
+    """The FastAPI app wired to the in-memory test database.
+
+    Exposed separately from ``client`` so a test can add its own dependency
+    override (e.g. different settings) without reaching into the transport.
+    """
+    application = create_app()
 
     async def _test_session() -> AsyncIterator[AsyncSession]:
         async with db_sessionmaker() as session:
@@ -81,15 +93,49 @@ async def client(db_sessionmaker, tmp_path: Path) -> AsyncIterator[AsyncClient]:
                 await session.rollback()
                 raise
 
-    app.dependency_overrides[get_session] = _test_session
+    application.dependency_overrides[get_session] = _test_session
     # Zero-arg closure: FastAPI would otherwise map **kwargs to a query param.
-    # media_dir under tmp_path keeps generated image files out of the repo.
-    media_dir = str(tmp_path / "media")
-    app.dependency_overrides[get_settings] = lambda: make_settings(media_dir=media_dir)
+    application.dependency_overrides[get_settings] = lambda: make_settings()
+    return application
 
+
+@pytest_asyncio.fixture
+async def client(app) -> AsyncIterator[AsyncClient]:
+    """App-level HTTP client wired to the in-memory test database."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as http:
         yield http
+
+
+# A token value distinctive enough that a leak into any API response is
+# detectable by substring search — see test_publishing_api.
+TEST_ACCESS_TOKEN = "live-page-token-must-never-be-serialized"
+
+
+async def connect_social_account(
+    db_sessionmaker,
+    platform,
+    *,
+    external_id: str = "wrcc-page-1",
+    display_name: str = "Western Riverina Community College",
+    access_token: str = TEST_ACCESS_TOKEN,
+    token_expires_at=None,
+):
+    """Insert an active connected account (stands in for the phase-3 OAuth flow)."""
+    from app.publishing.accounts import SocialAccountService
+
+    async with db_sessionmaker() as session:
+        account = await SocialAccountService(session, make_settings()).upsert(
+            platform=platform,
+            external_id=external_id,
+            display_name=display_name,
+            access_token=access_token,
+            actor_id=None,
+            token_expires_at=token_expires_at,
+            scopes=["pages_manage_posts"],
+        )
+        await session.commit()
+        return account.id
 
 
 ADMIN_EMAIL = "admin@wrcc.local"

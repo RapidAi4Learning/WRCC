@@ -1,0 +1,73 @@
+{
+  "$comment": [
+    "Shared contract for composing a post's single blob of text.",
+    "",
+    "Two implementations exist and must agree: backend `compose_post_text` in",
+    "app/publishing/rules.py, which produces the text that is actually posted,",
+    "and frontend `composePostText` in lib/postText.ts, which backs the Copy",
+    "button. They are hand-mirrored across languages, so nothing but a shared",
+    "fixture stops them drifting — each suite asserting its own hardcoded",
+    "strings would let one side change and both stay green, and the first",
+    "symptom would be a copied post that differs from the published one.",
+    "",
+    "Both suites iterate every case below. Add cases here, not in one suite."
+  ],
+  "cases": [
+    {
+      "name": "body, call to action and hashtags, in that order",
+      "body": "Enrol now: our courses.",
+      "call_to_action": "Book your spot.",
+      "hashtags": ["#WRCC", "#LearnLocal"],
+      "expected": "Enrol now: our courses.\n\nBook your spot.\n\n#WRCC #LearnLocal"
+    },
+    {
+      "name": "no call to action",
+      "body": "Enrol now: our courses.",
+      "call_to_action": null,
+      "hashtags": ["#WRCC"],
+      "expected": "Enrol now: our courses.\n\n#WRCC"
+    },
+    {
+      "name": "no hashtags",
+      "body": "Enrol now: our courses.",
+      "call_to_action": "Book your spot.",
+      "hashtags": [],
+      "expected": "Enrol now: our courses.\n\nBook your spot."
+    },
+    {
+      "name": "blank hashtag entries are dropped, not emitted as spaces",
+      "body": "Enrol now.",
+      "call_to_action": null,
+      "hashtags": ["#WRCC", "  ", ""],
+      "expected": "Enrol now.\n\n#WRCC"
+    },
+    {
+      "name": "surrounding whitespace is trimmed from every section",
+      "body": "  Enrol now.  ",
+      "call_to_action": "  Go.  ",
+      "hashtags": ["  #WRCC  "],
+      "expected": "Enrol now.\n\nGo.\n\n#WRCC"
+    },
+    {
+      "name": "an empty call to action is treated as absent",
+      "body": "Enrol now.",
+      "call_to_action": "   ",
+      "hashtags": [],
+      "expected": "Enrol now."
+    },
+    {
+      "name": "nothing to say produces nothing",
+      "body": "",
+      "call_to_action": null,
+      "hashtags": [],
+      "expected": ""
+    },
+    {
+      "name": "blank lines inside the body survive untouched",
+      "body": "Line one.\n\nLine two.",
+      "call_to_action": "Go.",
+      "hashtags": [],
+      "expected": "Line one.\n\nLine two.\n\nGo."
+    }
+  ]
+}

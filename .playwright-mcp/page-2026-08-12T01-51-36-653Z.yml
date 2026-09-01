@@ -1,0 +1,13 @@
+- generic [active] [ref=f1e1]:
+  - main [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - paragraph [ref=f1e4]: WRCC
+      - heading "Content Studio" [level=1] [ref=f1e5]
+      - paragraph [ref=f1e6]: Sign in to generate and review social content for Western Riverina Community College.
+      - generic [ref=f1e7]: Email
+      - textbox "Email" [ref=f1e8]: probe@example.invalid
+      - generic [ref=f1e9]: Password
+      - textbox "Password" [ref=f1e10]: not-a-real-password
+      - alert [ref=f1e12]: Invalid email or password.
+      - button "Sign in" [ref=f1e11] [cursor=pointer]
+  - alert [ref=f1e13]

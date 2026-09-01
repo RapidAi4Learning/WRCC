@@ -13,6 +13,13 @@ import type {
   WorkflowAction,
 } from "@/types/content";
 import type { Course, CourseDetail, SyncRun } from "@/types/course";
+import type {
+  AccountVerification,
+  AuthorizeUrl,
+  Publication,
+  PublishPreflight,
+  SocialAccount,
+} from "@/types/publishing";
 
 // Strip any trailing slash so `${API_BASE}/api/...` can't produce a double
 // slash. Lets the env var be set with or without a trailing slash safely.
@@ -92,6 +99,10 @@ export function fetchContent(filters?: {
   return request<ContentItem[]>(`/api/content${query ? `?${query}` : ""}`);
 }
 
+export function fetchContentItem(itemId: string): Promise<ContentItem> {
+  return request<ContentItem>(`/api/content/${itemId}`);
+}
+
 export function contentAction(
   itemId: string,
   action: WorkflowAction,
@@ -134,6 +145,72 @@ export function fetchImages(itemId: string): Promise<ContentImage[]> {
 
 export function imageFileUrl(image: ContentImage, download = false): string {
   return `${API_BASE}${image.file_url}${download ? "?download=true" : ""}`;
+}
+
+// ── Connected social accounts ──
+
+export function fetchSocialAccounts(signal?: AbortSignal): Promise<SocialAccount[]> {
+  return request<SocialAccount[]>("/api/social/accounts", { signal });
+}
+
+// Returns the provider's consent URL rather than redirecting, so a
+// misconfiguration surfaces as a readable error instead of an opaque
+// cross-origin redirect the page could not report on.
+export function fetchAuthorizeUrl(platform: Platform): Promise<AuthorizeUrl> {
+  return request<AuthorizeUrl>(`/api/social/${platform}/connect`);
+}
+
+// Pings the network. Resolves even when the token is dead — read `ok`.
+export function verifySocialAccount(
+  accountId: string,
+): Promise<AccountVerification> {
+  return request<AccountVerification>(
+    `/api/social/accounts/${accountId}/verify`,
+    { method: "POST" },
+  );
+}
+
+export function activateSocialAccount(accountId: string): Promise<SocialAccount> {
+  return request<SocialAccount>(`/api/social/accounts/${accountId}/activate`, {
+    method: "POST",
+  });
+}
+
+export async function disconnectSocialAccount(accountId: string): Promise<void> {
+  // 204 No Content — there is no body to parse, so this bypasses `request`.
+  const response = await fetch(`${API_BASE}/api/social/accounts/${accountId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, "Could not disconnect the account.");
+  }
+}
+
+// ── Publishing ──
+
+export function fetchPublishPreflight(
+  itemId: string,
+  imageId?: string,
+): Promise<PublishPreflight> {
+  const query = imageId ? `?image_id=${encodeURIComponent(imageId)}` : "";
+  return request<PublishPreflight>(
+    `/api/content/${itemId}/publish/preflight${query}`,
+  );
+}
+
+export function publishContent(
+  itemId: string,
+  imageId?: string,
+): Promise<Publication> {
+  return request<Publication>(`/api/content/${itemId}/publish`, {
+    method: "POST",
+    body: JSON.stringify({ image_id: imageId ?? null }),
+  });
+}
+
+export function fetchPublications(itemId: string): Promise<Publication[]> {
+  return request<Publication[]>(`/api/content/${itemId}/publications`);
 }
 
 // ── Catalog ──

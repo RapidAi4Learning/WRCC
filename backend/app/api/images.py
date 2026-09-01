@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.content import get_llm
@@ -99,16 +99,20 @@ async def image_file(
     image_id: uuid.UUID,
     download: bool = False,
     service: ContentImageService = Depends(get_image_service),
-) -> FileResponse:
+) -> Response:
     try:
         image = await service.get_image(image_id)
-        path = service.image_file(image)
     except ContentImageNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    # filename triggers Content-Disposition: attachment (browser download);
-    # without it the image renders inline in <img> tags.
-    return FileResponse(
-        path,
-        media_type="image/png",
-        filename=f"wrcc-post-image-{image.id.hex[:8]}.png" if download else None,
+    # Content-Disposition: attachment triggers a browser download; without it
+    # the image renders inline in <img> tags.
+    headers = (
+        {
+            "Content-Disposition": (
+                f'attachment; filename="wrcc-post-image-{image.id.hex[:8]}.png"'
+            )
+        }
+        if download
+        else {}
     )
+    return Response(content=image.data, media_type="image/png", headers=headers)

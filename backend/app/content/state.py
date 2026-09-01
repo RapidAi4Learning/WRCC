@@ -4,11 +4,16 @@ One source of truth for which status transitions are legal. The service layer
 calls ``assert_transition`` before mutating an item so an illegal move surfaces
 as a clean 409 rather than silent corruption.
 
-    draft → pending_approval → approved
+    draft → pending_approval → approved → published
               │        │
               │        └→ rejected → draft (edit)
               └→ draft (edit)
     any live state → archived; archived → draft (restore, fresh review cycle)
+
+``published`` is only reachable from ``approved``, and only through
+``PublishService`` — it means the post is live on someone else's server and
+cannot be taken back from here. It therefore has no path back to ``draft``:
+archiving is the only move left.
 """
 
 from __future__ import annotations
@@ -19,7 +24,8 @@ _ALLOWED: dict[S, set[S]] = {
     S.draft: {S.pending_approval, S.archived},
     S.pending_approval: {S.approved, S.rejected, S.draft, S.archived},
     S.rejected: {S.draft, S.archived},
-    S.approved: {S.archived},
+    S.approved: {S.archived, S.published},
+    S.published: {S.archived},
     S.archived: {S.draft},
 }
 

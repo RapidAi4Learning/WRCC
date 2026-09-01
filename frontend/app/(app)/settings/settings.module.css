@@ -1,0 +1,314 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-display);
+  line-height: 1.1;
+}
+
+.lede {
+  margin: 0;
+  color: var(--color-text-muted);
+  max-width: 42rem;
+}
+
+.loading {
+  color: var(--color-text-muted);
+}
+
+.notice {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  font-size: var(--text-sm);
+}
+
+.error {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
+
+/* ── Cards ── */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: var(--space-5);
+}
+
+.card,
+.cardConnected {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  /* The left rule carries the network's own colour, so the three cards read as
+     distinct destinations rather than a uniform grid. */
+  border-left: 4px solid var(--color-border);
+  border-top: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+/* Disconnected: quiet, outline only — nothing to look at yet. */
+.card {
+  background: transparent;
+}
+
+/* Connected: raised, with the platform colour on the rule. */
+.cardConnected {
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-raised);
+}
+
+.cardConnected[data-platform="facebook"] {
+  border-left-color: var(--color-facebook);
+}
+
+.cardConnected[data-platform="instagram"] {
+  border-left-color: var(--color-instagram);
+}
+
+.cardConnected[data-platform="linkedin"] {
+  border-left-color: var(--color-linkedin);
+}
+
+/* An expired token is the one thing on this page that needs acting on. */
+.cardConnected[data-attention="true"] {
+  border-left-color: var(--color-danger);
+  box-shadow: 0 0 0 1px var(--color-danger-soft), var(--shadow-raised);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: var(--text-lg);
+  flex: 1;
+}
+
+.dotOn,
+.dotOff {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.dotOn {
+  background: var(--color-accent);
+}
+
+.dotOff {
+  background: var(--color-border);
+}
+
+.blurb {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  flex: 1;
+}
+
+/* ── Accounts ── */
+
+.accountList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1;
+}
+
+.account {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+}
+
+.accountMain {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.accountName {
+  margin: 0;
+  font-weight: 600;
+}
+
+.accountHandle {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.destination {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
+/* The expiry countdown is the only live data on this page — it should read
+   like it, not like body copy. */
+.expiryOk,
+.expiryWarn,
+.expiryBad {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.expiryOk {
+  color: var(--color-text-muted);
+}
+
+.expiryWarn {
+  color: var(--color-warn);
+  font-weight: 600;
+}
+
+.expiryBad {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.accountActions {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+/* ── Buttons ── */
+
+.cardFooter {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.primaryButton,
+.secondaryButton {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.primaryButton {
+  border: none;
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--color-accent-strong);
+}
+
+.secondaryButton {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.secondaryButton:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.linkButton,
+.dangerButton {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.linkButton {
+  color: var(--color-accent);
+}
+
+.linkButton:hover:not(:disabled) {
+  color: var(--color-accent-strong);
+  text-decoration: underline;
+}
+
+.dangerButton {
+  color: var(--color-text-muted);
+}
+
+.dangerButton:hover:not(:disabled) {
+  color: var(--color-danger);
+  text-decoration: underline;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.linkButton:disabled,
+.dangerButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible,
+.linkButton:focus-visible,
+.dangerButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

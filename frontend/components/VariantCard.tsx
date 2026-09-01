@@ -3,13 +3,25 @@
 // One generated variant with inline workflow actions. Used by Generate
 // (fresh results) and History (expanded row).
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { ApiError, contentAction, editContent } from "@/lib/api";
+import {
+  ApiError,
+  contentAction,
+  editContent,
+  fetchContentItem,
+  fetchPublications,
+} from "@/lib/api";
+import { composePostText } from "@/lib/postText";
+import { publishingHold } from "@/lib/publishing";
 import type { ContentItem, WorkflowAction } from "@/types/content";
+import type { Publication } from "@/types/publishing";
 import { PlatformBadge, StatusBadge } from "@/components/Badges";
 import ImagePanel from "@/components/ImagePanel";
+import PublishDialog from "@/components/PublishDialog";
 import styles from "./VariantCard.module.css";
+
+const COPIED_FEEDBACK_MS = 2000;
 
 const STYLE_LABELS: Record<string, string> = {
   direct: "A · Direct",
@@ -19,7 +31,10 @@ const STYLE_LABELS: Record<string, string> = {
 
 interface VariantCardProps {
   item: ContentItem;
-  onChange: (updated: ContentItem, action: WorkflowAction | "edit") => void;
+  onChange: (
+    updated: ContentItem,
+    action: WorkflowAction | "edit" | "publish",
+  ) => void;
   showPlatform?: boolean;
 }
 
@@ -32,6 +47,54 @@ export default function VariantCard({
   const [draftBody, setDraftBody] = useState(item.body);
   const [error, setError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [hasCopied, setHasCopied] = useState(false);
+  const [isPublishOpen, setIsPublishOpen] = useState(false);
+  const [permalink, setPermalink] = useState<string | null>(null);
+
+  const isPublished = item.status === "published";
+  // A network-wide hold outranks the item's own workflow state: the post can be
+  // perfectly approved and still have nowhere to go.
+  const hold = publishingHold(item.platform);
+
+  // A published card states where it went live. The permalink lives on the
+  // attempt, not the item, so it costs one small request — only for the cards
+  // that have something to link to.
+  useEffect(() => {
+    if (!isPublished || permalink !== null) return;
+    let cancelled = false;
+    fetchPublications(item.id)
+      .then((publications) => {
+        const live = publications.find((p) => p.status === "succeeded");
+        if (!cancelled && live?.permalink) setPermalink(live.permalink);
+      })
+      .catch(() => {
+        // The badge already says it is published; a missing link is not worth
+        // an error banner on an otherwise healthy card.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPublished, permalink, item.id]);
+
+  // Revert the "Copied" label on its own; the cleanup also covers the card
+  // unmounting (History collapsing a row) before the timer fires.
+  useEffect(() => {
+    if (!hasCopied) return;
+    const timer = window.setTimeout(() => setHasCopied(false), COPIED_FEEDBACK_MS);
+    return () => window.clearTimeout(timer);
+  }, [hasCopied]);
+
+  async function handleCopy() {
+    setError(null);
+    try {
+      // Throws when the Clipboard API is missing entirely — it needs a secure
+      // context, so serving the app over plain http on a LAN IP has none.
+      await navigator.clipboard.writeText(composePostText(item));
+      setHasCopied(true);
+    } catch {
+      setError("Could not copy to the clipboard.");
+    }
+  }
 
   async function runAction(
     action: WorkflowAction,
@@ -74,7 +137,24 @@ export default function VariantCard({
     void runAction("regenerate", instruction ? { instruction } : undefined);
   }
 
-  const actions: Array<{ label: string; onClick: () => void; show: boolean }> = [
+  async function handlePublished(publication: Publication) {
+    setPermalink(publication.permalink);
+    // The dialog stays open on its success panel; refresh the item underneath
+    // from the server rather than assuming what the publish did to its status.
+    try {
+      onChange(await fetchContentItem(item.id), "publish");
+    } catch {
+      // The post is live either way — the card catches up on the next load.
+    }
+  }
+
+  const actions: Array<{
+    label: string;
+    onClick: () => void;
+    show: boolean;
+    disabled?: boolean;
+    title?: string;
+  }> = [
     {
       label: "Submit for approval",
       onClick: () => void runAction("submit"),
@@ -91,12 +171,28 @@ export default function VariantCard({
       show: item.status === "pending_approval",
     },
     {
+      label: "Publish",
+      onClick: () => setIsPublishOpen(true),
+      show: item.status === "approved",
+      // Disabled rather than hidden: a missing button reads as a bug, and the
+      // reason is worth telling the person who was about to click it.
+      disabled: hold !== null,
+      title: hold ?? undefined,
+    },
+    {
       label: "Edit",
       onClick: () => {
         setDraftBody(item.body);
         setIsEditing(true);
       },
-      show: !isEditing && item.status !== "archived" && item.status !== "approved",
+      // Published is absent for the same reason approved is, only harder: the
+      // text is already live on someone else's server, so editing it here would
+      // silently put our copy out of step with theirs.
+      show:
+        !isEditing &&
+        item.status !== "archived" &&
+        item.status !== "approved" &&
+        !isPublished,
     },
     {
       label: "Duplicate",
@@ -106,7 +202,7 @@ export default function VariantCard({
     {
       label: "Regenerate",
       onClick: handleRegenerate,
-      show: item.status !== "archived",
+      show: item.status !== "archived" && !isPublished,
     },
     {
       label: "Archive",
@@ -128,6 +224,23 @@ export default function VariantCard({
         </span>
         {showPlatform ? <PlatformBadge platform={item.platform} /> : null}
         <StatusBadge status={item.status} />
+        {permalink ? (
+          <a
+            className={styles.permalink}
+            href={permalink}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            View post ↗
+          </a>
+        ) : null}
+        <button
+          type="button"
+          className={hasCopied ? styles.copyDone : styles.copy}
+          onClick={() => void handleCopy()}
+        >
+          {hasCopied ? "Copied" : "Copy"}
+        </button>
       </header>
 
       {isEditing ? (
@@ -183,7 +296,8 @@ export default function VariantCard({
               type="button"
               className={styles.action}
               onClick={action.onClick}
-              disabled={busyAction !== null}
+              disabled={busyAction !== null || action.disabled === true}
+              title={action.title}
             >
               {action.label}
             </button>
@@ -191,6 +305,18 @@ export default function VariantCard({
       </footer>
 
       <ImagePanel itemId={item.id} />
+
+      {hold && item.status === "approved" ? (
+        <p className={styles.hold}>{hold}</p>
+      ) : null}
+
+      {isPublishOpen && !hold ? (
+        <PublishDialog
+          item={item}
+          onClose={() => setIsPublishOpen(false)}
+          onPublished={(publication) => void handlePublished(publication)}
+        />
+      ) : null}
     </article>
   );
 }

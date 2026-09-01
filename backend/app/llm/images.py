@@ -27,7 +27,11 @@ class ImageClient(Protocol):
         ...
 
 
-_MOCK_IMAGE_SIZE = 64
+# Matches the live gpt-image-1 default. Not cosmetic: Instagram rejects images
+# under 320px, so a smaller mock would make the Instagram publish path
+# unreachable in mock mode. A solid-colour PNG this size still compresses to a
+# few KB.
+_MOCK_IMAGE_SIZE = 1024
 
 
 def _solid_png(rgb: tuple[int, int, int], size: int = _MOCK_IMAGE_SIZE) -> bytes:

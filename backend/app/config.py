@@ -93,7 +93,6 @@ class Settings(BaseSettings):
     image_model: str = "gpt-image-1"
     image_size: str = "1024x1024"
     image_quality: Literal["low", "medium", "high", "auto"] = "medium"
-    media_dir: str = "media"
 
     # ── Scraper (politeness + bounded retries) ──
     scraper_base_url: str = "https://wrcc.nsw.edu.au"
@@ -105,6 +104,66 @@ class Settings(BaseSettings):
     # ── Reference URL enrichment (best-effort, never blocks generation) ──
     reference_fetch_timeout_seconds: float = 8.0
     reference_fetch_max_chars: int = 4000
+
+    # ── Publishing (mock-first, D8 — see docs/PUBLISH-PLAN.md) ──
+    publish_mock: bool = True
+    # Public HTTPS origin of *this* backend. Builds the OAuth redirect URIs and
+    # the image URLs Meta fetches server-side, so it cannot be inferred from a
+    # request (which may arrive via a proxy or an internal hostname).
+    public_api_base_url: str = ""
+    # Where the networks fetch post images from. Defaults to
+    # `public_api_base_url`; set separately only when the two genuinely differ.
+    #
+    # They differ whenever the public host is a throwaway tunnel. An OAuth
+    # redirect URI has to match a value registered in a provider dashboard, so
+    # it wants a stable host; an image URL is just downloaded and is registered
+    # nowhere, so an ephemeral host costs nothing. Tying both to one setting
+    # forces a dashboard edit every time the tunnel restarts.
+    public_media_base_url: str = ""
+
+    @property
+    def media_base_url(self) -> str:
+        return self.public_media_base_url or self.public_api_base_url
+
+    # Fernet key for tokens at rest:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    token_encryption_key: str = ""
+    # Signs public image URLs. Deliberately separate from auth_secret: leaking
+    # the one that signs images must not let anyone forge a session.
+    media_signing_secret: str = ""
+    media_url_ttl_seconds: int = 900
+    publish_timeout_seconds: float = 30.0
+    publish_max_attempts: int = 3
+    # Exponential backoff base between retries of a throttled/transient call.
+    # Tests set this to 0 so the suite does not actually sleep.
+    publish_retry_base_delay_seconds: float = 0.5
+    # Instagram builds the post in a container before it can be published;
+    # images are usually immediate, but the API is asynchronous by contract.
+    instagram_container_poll_attempts: int = 12
+    instagram_container_poll_delay_seconds: float = 2.0
+    # An attempt still `pending` after this long is reported as unknown rather
+    # than retried — we may have posted and lost the response.
+    publish_pending_stale_seconds: int = 300
+
+    # ── Meta (Facebook + Instagram) ──
+    meta_app_id: str = ""
+    meta_app_secret: str = ""
+    meta_graph_version: str = "v23.0"
+    # Set when using a Facebook Login for Business configuration; the dialog
+    # then derives permissions from the dashboard and `scope` must be omitted
+    # (business-type apps reject bare scopes as "Invalid Scopes").
+    meta_login_config_id: str = ""
+
+    # ── LinkedIn ──
+    linkedin_client_id: str = ""
+    linkedin_client_secret: str = ""
+    linkedin_api_version: str = "202506"
+    # urn:li:organization:{id} — or urn:li:person:{id} for the member fallback.
+    linkedin_author_urn: str = ""
+
+    @property
+    def graph_base_url(self) -> str:
+        return f"https://graph.facebook.com/{self.meta_graph_version}"
 
     @model_validator(mode="after")
     def _validate_required_when_live(self) -> Settings:
@@ -120,6 +179,35 @@ class Settings(BaseSettings):
                 missing.append(
                     "OPENAI_API_KEY (required when LLM_MOCK=false and LLM_PROVIDER=openai)"
                 )
+
+        if not self.publish_mock:
+            required = {
+                "PUBLIC_API_BASE_URL": self.public_api_base_url,
+                "TOKEN_ENCRYPTION_KEY": self.token_encryption_key,
+                "MEDIA_SIGNING_SECRET": self.media_signing_secret,
+                "META_APP_ID": self.meta_app_id,
+                "META_APP_SECRET": self.meta_app_secret,
+                "LINKEDIN_CLIENT_ID": self.linkedin_client_id,
+                "LINKEDIN_CLIENT_SECRET": self.linkedin_client_secret,
+            }
+            missing.extend(
+                f"{name} (required when PUBLISH_MOCK=false)"
+                for name, value in required.items()
+                if not value
+            )
+            # Both of these must differ from AUTH_SECRET. Reuse is easy to fall
+            # into — every one of them is "a long random string" — and it fuses
+            # three separate blast radii into one: a single leak would forge
+            # sessions, decrypt every stored OAuth token, and sign image URLs.
+            for name, value in (
+                ("MEDIA_SIGNING_SECRET", self.media_signing_secret),
+                ("TOKEN_ENCRYPTION_KEY", self.token_encryption_key),
+            ):
+                if value and value == self.auth_secret:
+                    missing.append(
+                        f"{name} (must differ from AUTH_SECRET — one leaked key "
+                        "must not also be able to forge sessions)"
+                    )
 
         if self.app_env == "production":
             if self.auth_secret == _AUTH_SECRET_PLACEHOLDER:

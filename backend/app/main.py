@@ -29,11 +29,16 @@ def create_app() -> FastAPI:
     from app.api.content import router as content_router
     from app.api.courses import router as courses_router
     from app.api.images import router as images_router
+    from app.api.public_media import router as public_media_router
+    from app.api.publishing import router as publishing_router
     from app.auth.router import router as auth_router
 
     app.include_router(auth_router)
     app.include_router(content_router)
     app.include_router(images_router)
+    app.include_router(publishing_router)
+    # Unauthenticated by design — the networks fetch post images from it.
+    app.include_router(public_media_router)
     app.include_router(courses_router)
 
     return app

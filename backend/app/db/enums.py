@@ -29,3 +29,19 @@ class ContentStatus(enum.StrEnum):
     approved = "approved"
     rejected = "rejected"
     archived = "archived"
+    # Live on the network. Reachable only from `approved` and only via a
+    # successful publish — never set by an ordinary workflow transition.
+    published = "published"
+
+
+class PublishStatus(enum.StrEnum):
+    """Outcome of a single publish attempt (one ``content_publications`` row).
+
+    ``pending`` is written *before* the network call, so an attempt that dies
+    mid-flight leaves evidence instead of silence: we may have posted and lost
+    the response, and that is a different situation from never having tried.
+    """
+
+    pending = "pending"
+    succeeded = "succeeded"
+    failed = "failed"

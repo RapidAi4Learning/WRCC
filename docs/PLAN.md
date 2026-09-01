@@ -23,11 +23,19 @@ catálogo de `mcc-growth-agent`.
 5. **Integración catálogo → generación**: elegir un curso y generar las 3 ideas
    con sus datos reales (nombre, código, precio, próximas fechas, ubicaciones).
 
-**Incluye además** (pedido post-plan): **login básico** — ver §4a y D2.
+**Incluye además** (pedidos post-plan, en orden cronológico):
+- **Login básico** — ver §4a y D2.
+- **Imágenes de post** — generación con `gpt-image-1`, bytes guardados en
+  `content_images.data` (migración `0005`), panel en `VariantCard`.
+- **Publicación a las redes** — Facebook, Instagram y LinkedIn, con OAuth
+  in-app, tokens cifrados y un gate HITL de `approved` → `published`. Tiene su
+  propio documento: [`PUBLISH-PLAN.md`](PUBLISH-PLAN.md), decisiones D5–D8.
 
 **Fuera de alcance (deliberado, para acotar diffs)**
-- Publicación a las redes (Meta/LinkedIn APIs), scheduling, analytics,
-  campañas, brand-voice profiles editables, imágenes/media, comentarios/DMs.
+- Scheduling, analytics, campañas, brand-voice profiles editables,
+  comentarios/DMs.
+- ~~Publicación a las redes~~ e ~~imágenes/media~~: ambas salieron de este
+  apartado más tarde (ver arriba). El resto de la lista sigue vigente.
 - Gestión de usuarios avanzada (roles/permisos, registro self-service,
   recuperación de contraseña); el login es básico: usuarios seeded + sesión.
 - El historial de revisiones por item (`content_revisions`) queda como

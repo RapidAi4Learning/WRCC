@@ -10,6 +10,9 @@ Social content generation + course catalog studio for
 - **History** — every generated variant is persisted with an approval workflow
   (`draft → pending_approval → approved/rejected`, plus edit / archive /
   restore / duplicate / regenerate), all audited.
+- **Publish** — send an approved post to the Facebook Page, Instagram Business
+  account or LinkedIn Company Page it was written for, from inside the app.
+  Accounts are connected once via OAuth; tokens are encrypted at rest.
 - **Catalog** — a polite scraper crawls the WRCC site (aXcelerate-rendered
   courses + scheduled offerings) and stages a diff; **nothing touches the live
   catalog until a human approves the changeset**.
@@ -24,7 +27,7 @@ Social content generation + course catalog studio for
 | LLM | `google-genai` (Gemini) or `openai` (GPT) behind an `LLMClient` protocol with a deterministic mock (`LLM_MOCK=true` by default; provider via `LLM_PROVIDER`) |
 | Scraper | httpx (politeness delay + bounded retries) + BeautifulSoup |
 | Frontend | Next.js 14, React 18, TypeScript, CSS modules |
-| Tests | pytest + pytest-asyncio (103 tests, HTML fixtures); vitest + Playwright |
+| Tests | pytest + pytest-asyncio (416 tests, HTML fixtures, `httpx.MockTransport` for wire contracts); vitest (66) + Playwright |
 
 ## Getting started
 
@@ -58,7 +61,7 @@ Point the frontend at a non-default API host with
 | Where | Command | What |
 |---|---|---|
 | backend | `pytest` | full suite (no network, no Postgres needed) |
-| backend | `pytest --cov=app` | coverage (currently ~89%) |
+| backend | `pytest --cov=app` | coverage (currently ~93%) |
 | backend | `ruff check app tests` · `mypy app` | lint / types |
 | frontend | `npm run test` | vitest component tests |
 | frontend | `npm run test:e2e` | Playwright smoke (starts its own dev server) |
@@ -75,6 +78,9 @@ See [`backend/.env.example`](backend/.env.example). Highlights:
 - **No hardcoded secrets**: the admin seed reads `ADMIN_EMAIL` /
   `ADMIN_PASSWORD` and refuses to run without them; production rejects the
   `AUTH_SECRET` placeholder.
+- **Publishing (D8)** follows the same contract: `PUBLISH_MOCK=false` requires
+  the public origin, both signing/encryption secrets and every network
+  credential — see *Going live* below.
 
 ## Architecture notes
 
@@ -88,7 +94,12 @@ backend/app/
 │                validation (deterministic ranking baseline)
 ├── llm/         LLMClient protocol · MockLLMClient · GeminiLLMClient · OpenAILLMClient
 ├── content/     schemas · state machine · repository · services (generate + workflow)
-└── api/         routers: content, courses (+ sync), auth, health
+├── publishing/  crypto (Fernet) · media (JPEG + signed URLs) · rules (preflight)
+│                · service (the one irreversible path) · accounts
+│                ├ oauth/       meta · linkedin · mock, behind get_oauth_provider
+│                └ publishers/  facebook · instagram · linkedin · mock + retry
+└── api/         routers: content, courses (+ sync), auth, health, publishing,
+                 public_media
 ```
 
 - **Sync HITL**: `POST /api/courses/sync` opens a `scraper_runs` row and crawls
@@ -102,9 +113,72 @@ backend/app/
   warnings, never errors.
 - **Auditing**: every mutation (generation, workflow transition, sync review)
   writes an `audit_logs` row with the acting user.
+- **`shared/`**: fixtures both test suites read, for logic that exists once per
+  language and must not drift. Today that is `post-text-cases.json`, the
+  contract between `compose_post_text` (what gets posted) and `composePostText`
+  (what the Copy button produces). Asserting hardcoded strings on each side
+  would let one change while both suites stayed green.
+
+## Publishing
+
+An **approved** post can be sent to the network it was written for. Connect an
+account under **Settings → Connections**, then hit **Publish** on the card. See
+[`docs/PUBLISH-PLAN.md`](docs/PUBLISH-PLAN.md) for the full design and
+decisions D5–D8.
+
+- **Facebook** — Page feed, with or without a photo. Image bytes are uploaded
+  directly, so Facebook publishing does not need a public host.
+- **Instagram** — the container → poll → publish two-step. Always needs an
+  image, and the image must be reachable by Meta, which is what the signed
+  public URL below is for.
+- **LinkedIn** — Company Page via the versioned REST API (three-leg image
+  upload); posting as a member is the fallback if the Community Management API
+  is not approved.
+
+Publish is the only action in this app whose effect is on someone else's
+server, so it is guarded at four levels rather than one: only `approved` items
+qualify; the server's own preflight must pass; the dialog asks for a second,
+explicit confirmation; and a partial unique index makes a second *successful*
+publication of the same item impossible at the database level. The `pending`
+attempt row is committed **before** the network call, so "we may have posted
+and lost the response" stays distinguishable from "we never tried".
+
+A published item keeps only **Archive** and **Duplicate**. It cannot be edited
+or regenerated here — our copy must not drift from what is live.
+
+`PUBLISH_MOCK=true` (the default) keeps the app bootable with zero credentials,
+exactly like `LLM_MOCK`, and the whole flow is exercisable offline: connect
+from Settings, approve a post in History, publish it from the card.
+
+### Going live
+
+Setting `PUBLISH_MOCK=false` requires `PUBLIC_API_BASE_URL`,
+`TOKEN_ENCRYPTION_KEY`, `MEDIA_SIGNING_SECRET` and the credential pair for each
+network — validated at startup, fail-fast. Outside the app you also need:
+
+1. A Meta app left in **Development mode** (no App Review), with whoever
+   authorises it holding a role on the app.
+2. The Instagram account converted to **Business** and linked to the Facebook
+   Page.
+3. LinkedIn's **Community Management API** approved, for Company Page posting.
+4. A public HTTPS origin for the backend — Instagram fetches the image
+   server-side. `ngrok http 8000` is enough to test against the real networks.
+
+Confirm `META_GRAPH_VERSION` and `LINKEDIN_API_VERSION` against the live
+changelogs before going live; both providers ship breaking versions on a
+schedule, which is why they are env vars.
+
+### The one unauthenticated endpoint
+
+`GET /api/public/images/{id}.jpg` serves an image to Meta without a session,
+because Instagram will not send a cookie. It is guarded by an HMAC signature
+over the id and expiry, compared in constant time, with a ~15-minute TTL, and
+every failure answers **404 rather than 403** so it cannot be used to test
+whether an id exists. `MEDIA_SIGNING_SECRET` must differ from `AUTH_SECRET` —
+enforced at startup — so a leaked image key cannot forge a session.
 
 ## Deliberately out of scope
 
-Publishing to the networks (Meta/LinkedIn APIs), scheduling, analytics,
-campaigns, editable brand-voice profiles, media, user management beyond the
-seeded login. See `docs/PLAN.md` for the full plan and decisions D1–D4.
+Scheduling, analytics, campaigns, editable brand-voice profiles, user
+management beyond the seeded login. See `docs/PLAN.md` for the full plan and
+decisions D1–D4.
