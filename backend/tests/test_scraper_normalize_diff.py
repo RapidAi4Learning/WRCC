@@ -137,8 +137,25 @@ def test_changed_price_and_new_offering_are_classified() -> None:
 
 def test_missing_course_and_offering_are_removed_softly() -> None:
     changeset = build_changeset([], [_live_course()])
-    assert changeset["courses_removed"] == ["HLTAID011"]
-    assert changeset["offerings_removed"] == ["111"]
+    assert changeset["summary"]["courses_removed"] == 1
+    assert changeset["summary"]["offerings_removed"] == 1
+    assert changeset["courses_removed"][0]["course_code"] == "HLTAID011"
+    assert changeset["offerings_removed"][0]["offering_code"] == "111"
+
+
+def test_removed_entries_carry_context_for_the_reviewer() -> None:
+    """A code alone is not reviewable — the panel needs to name what goes dark."""
+    changeset = build_changeset([], [_live_course()])
+
+    course = changeset["courses_removed"][0]
+    assert course["title"] == "HLTAID011 Course"
+    assert course["category"] == "First Aid"
+    assert course["offerings_affected"] == 1
+
+    offering = changeset["offerings_removed"][0]
+    assert offering["course_code"] == "HLTAID011"
+    assert offering["start_date"] == "2026-08-07"
+    assert offering["price"] == 185.0
 
 
 def test_inactive_live_rows_do_not_re_remove() -> None:

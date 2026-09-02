@@ -1,7 +1,7 @@
 [project]
 name = "wrcc-backend"
 version = "0.1.0"
-description = "WRCC Content Studio — backend (FastAPI)"
+description = "WRCC Social Media Marketing — backend (FastAPI)"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",

@@ -99,7 +99,7 @@ class Settings(BaseSettings):
     scraper_request_delay_ms: int = 500
     scraper_max_retries: int = 3
     scraper_timeout_seconds: float = 20.0
-    scraper_user_agent: str = "WRCC-ContentStudio/1.0 (+https://wrcc.nsw.edu.au)"
+    scraper_user_agent: str = "WRCC-SocialMediaMarketing/1.0 (+https://wrcc.nsw.edu.au)"
 
     # ── Reference URL enrichment (best-effort, never blocks generation) ──
     reference_fetch_timeout_seconds: float = 8.0

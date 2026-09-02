@@ -1,4 +1,4 @@
-# WRCC Content Studio
+# WRCC Social Media Marketing
 
 Social content generation + course catalog studio for
 [Western Riverina Community College](https://wrcc.nsw.edu.au/).

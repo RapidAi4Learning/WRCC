@@ -10,7 +10,7 @@ from app.config import get_settings
 def create_app() -> FastAPI:
     settings = get_settings()
 
-    app = FastAPI(title="WRCC Content Studio", version="0.1.0")
+    app = FastAPI(title="WRCC Social Media Marketing", version="0.1.0")
 
     from fastapi.middleware.cors import CORSMiddleware
 

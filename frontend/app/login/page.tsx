@@ -40,7 +40,7 @@ function LoginForm() {
   return (
     <form className={styles.card} onSubmit={handleSubmit}>
       <p className={styles.brand}>WRCC</p>
-      <h1 className={styles.title}>Content Studio</h1>
+      <h1 className={styles.title}>Social Media Marketing</h1>
       <p className={styles.subtitle}>
         Sign in to generate and review social content for Western Riverina
         Community College.

@@ -15,6 +15,7 @@ import {
   startSync,
 } from "@/lib/api";
 import type { Course, CourseDetail, SyncRun } from "@/types/course";
+import SyncReviewPanel from "@/components/SyncReviewPanel";
 import styles from "./catalog.module.css";
 
 const RUNNING_POLL_MS = 2000;
@@ -24,6 +25,10 @@ export default function CatalogPage() {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<CourseDetail | null>(null);
   const [runs, setRuns] = useState<SyncRun[]>([]);
+  // Code → title for every course seen so far. The changeset identifies courses
+  // by code, and the list above it can be filtered down by a search, so the
+  // review panel needs a lookup that outlives the current filter.
+  const [courseTitles, setCourseTitles] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
 
@@ -35,6 +40,12 @@ export default function CatalogPage() {
       ]);
       setCourses(fetchedCourses);
       setRuns(fetchedRuns);
+      setCourseTitles((previous) => ({
+        ...previous,
+        ...Object.fromEntries(
+          fetchedCourses.map((course) => [course.course_code, course.title]),
+        ),
+      }));
       setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not load catalog.");
@@ -107,45 +118,23 @@ export default function CatalogPage() {
         </p>
       ) : null}
 
+      {hasRunningRun ? (
+        <p className={styles.runningNote}>
+          Crawling every category and course page. Nothing changes until the
+          result comes back here for review.
+        </p>
+      ) : null}
+
       {pendingRun ? (
-        <section className={styles.pendingPanel} aria-label="Pending sync review">
-          <h2 className={styles.pendingTitle}>Changeset awaiting review</h2>
-          <p className={styles.pendingMeta}>
-            {pendingRun.courses_found} courses · {pendingRun.offerings_found}{" "}
-            offerings crawled
-          </p>
-          {pendingRun.changeset?.summary ? (
-            <dl className={styles.summary}>
-              {Object.entries(pendingRun.changeset.summary).map(([key, value]) => (
-                <div key={key} className={styles.summaryItem}>
-                  <dt>{key.replace(/_/g, " ")}</dt>
-                  <dd data-nonzero={Number(value) > 0}>{value as number}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : null}
-          <div className={styles.pendingActions}>
-            <button
-              type="button"
-              className={styles.approve}
-              onClick={() => void withBusy(() => approveSyncRun(pendingRun.id))}
-              disabled={isBusy}
-            >
-              Approve &amp; apply
-            </button>
-            <button
-              type="button"
-              className={styles.reject}
-              onClick={() => {
-                const reason = window.prompt("Reason (optional):") ?? undefined;
-                void withBusy(() => rejectSyncRun(pendingRun.id, reason));
-              }}
-              disabled={isBusy}
-            >
-              Reject
-            </button>
-          </div>
-        </section>
+        <SyncReviewPanel
+          run={pendingRun}
+          isBusy={isBusy}
+          courseTitles={courseTitles}
+          onApprove={() => void withBusy(() => approveSyncRun(pendingRun.id))}
+          onReject={(reason) =>
+            void withBusy(() => rejectSyncRun(pendingRun.id, reason))
+          }
+        />
       ) : latestRun && latestRun.status === "failed" ? (
         <p className={styles.error}>Last sync failed: {latestRun.error}</p>
       ) : null}

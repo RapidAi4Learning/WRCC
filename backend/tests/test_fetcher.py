@@ -29,7 +29,7 @@ async def test_fetch_returns_body_and_sends_user_agent() -> None:
 
     async with _fetcher_with_transport(handler) as fetcher:
         assert await fetcher.fetch_text("https://example.test/page") == "<html>ok</html>"
-    assert seen_agents == ["WRCC-ContentStudio/1.0 (+https://wrcc.nsw.edu.au)"]
+    assert seen_agents == ["WRCC-SocialMediaMarketing/1.0 (+https://wrcc.nsw.edu.au)"]
 
 
 async def test_fetch_retries_transient_errors_then_succeeds() -> None:

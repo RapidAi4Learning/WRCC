@@ -81,6 +81,33 @@ def offering_payload(offering: ScrapedOffering) -> dict:
     return payload
 
 
+def _removed_course(course: dict) -> dict:
+    """Identity plus the context needed to judge a deactivation on sight.
+
+    ``courses_removed`` used to be a bare list of codes, which made the review
+    screen useless: nobody can approve deactivating "HLTAID011" without knowing
+    what it is or how many scheduled dates go down with it.
+    """
+    return {
+        "course_code": course["course_code"],
+        "title": course.get("title"),
+        "category": course.get("category"),
+        "offerings_affected": sum(
+            1 for o in course.get("offerings", []) if o.get("is_active", True)
+        ),
+    }
+
+
+def _removed_offering(code: str, offering: dict, course_code: str | None) -> dict:
+    return {
+        "offering_code": code,
+        "course_code": course_code,
+        "start_date": _serialize(offering.get("start_date")),
+        "location": offering.get("location"),
+        "price": _normalize("price", offering.get("price")),
+    }
+
+
 def _field_changes(
     fields: tuple[str, ...], live: dict, scraped: dict
 ) -> dict[str, dict]:
@@ -167,10 +194,12 @@ def build_changeset(
 
     for code, course in live_by_code.items():
         if code not in seen_courses and course.get("is_active", True):
-            changeset["courses_removed"].append(code)
+            changeset["courses_removed"].append(_removed_course(course))
     for code, offering in live_offerings.items():
         if code not in seen_offerings and offering.get("is_active", True):
-            changeset["offerings_removed"].append(code)
+            changeset["offerings_removed"].append(
+                _removed_offering(code, offering, offering_course.get(code))
+            )
 
     changeset["summary"] = {key: len(value) for key, value in changeset.items()}
     return changeset

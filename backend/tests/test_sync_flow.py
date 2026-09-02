@@ -7,10 +7,11 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.config import Settings
-from app.db.models import AuditLog
+from app.db.models import AuditLog, Course, CourseOffering
 from app.scraper.discovery import parse_category_page
 from app.scraper.normalize import build_course_groups
 from app.scraper.parser import parse_course_detail
+from app.scraper.repository import CatalogRepository
 from app.scraper.service import SyncService
 from app.scraper.types import ScrapedCourseGroup
 from tests.conftest import FIXTURES, make_settings
@@ -162,3 +163,42 @@ async def test_zero_offering_crawl_fails_run(
     run = (await auth_client.get(f"/api/courses/sync/{response.json()['id']}")).json()
     assert run["status"] == "failed"
     assert "zero offerings" in run["error"]
+
+
+async def test_legacy_removed_codes_still_apply(db_sessionmaker) -> None:
+    """A run staged before removals carried context holds bare code strings.
+
+    Such a run can still be sitting in review, so approving it has to keep
+    working rather than silently skipping the deactivations.
+    """
+    async with db_sessionmaker() as session:
+        repository = CatalogRepository(session)
+        await repository.apply_changeset(
+            {
+                "courses_added": [
+                    {
+                        "course_code": "OLD101",
+                        "title": "Legacy course",
+                        "offerings": [{"offering_code": "9001", "status": "active"}],
+                    }
+                ]
+            }
+        )
+        await session.commit()
+
+        await repository.apply_changeset(
+            {"courses_removed": ["OLD101"], "offerings_removed": ["9001"]}
+        )
+        await session.commit()
+
+        course = (
+            await session.execute(select(Course).where(Course.course_code == "OLD101"))
+        ).scalar_one()
+        offering = (
+            await session.execute(
+                select(CourseOffering).where(CourseOffering.offering_code == "9001")
+            )
+        ).scalar_one()
+
+    assert course.is_active is False
+    assert offering.is_active is False

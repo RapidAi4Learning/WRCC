@@ -17,6 +17,21 @@ def _date_from_iso(value: str | None) -> dt.date | None:
     return dt.date.fromisoformat(value) if value else None
 
 
+def _removed_code(entry: object, key: str) -> str | None:
+    """Read the code out of a ``*_removed`` entry.
+
+    Entries carry identifying context now, but a run staged before that change
+    can still be sitting in review with bare code strings — approving it must
+    not blow up.
+    """
+    if isinstance(entry, str):
+        return entry
+    if isinstance(entry, dict):
+        code = entry.get(key)
+        return code if isinstance(code, str) else None
+    return None
+
+
 class CatalogRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -87,8 +102,9 @@ class CatalogRepository:
             for field, change in updated["changes"].items():
                 setattr(updated_course, field, change["to"])
 
-        for code in changeset.get("courses_removed", []):
-            removed_course = courses_by_code.get(code)
+        for entry in changeset.get("courses_removed", []):
+            code = _removed_code(entry, "course_code")
+            removed_course = courses_by_code.get(code) if code else None
             if removed_course is not None:
                 removed_course.is_active = False
 
@@ -110,8 +126,9 @@ class CatalogRepository:
                     value = _date_from_iso(value)
                 setattr(offering, field, value)
 
-        for code in changeset.get("offerings_removed", []):
-            offering = offerings_by_code.get(code)
+        for entry in changeset.get("offerings_removed", []):
+            code = _removed_code(entry, "offering_code")
+            offering = offerings_by_code.get(code) if code else None
             if offering is not None:
                 offering.is_active = False
                 offering.status = "cancelled"

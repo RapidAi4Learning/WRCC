@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start the WRCC Content Studio backend (FastAPI :8000) and frontend (Next.js :3000).
+# Start the WRCC Social Media Marketing backend (FastAPI :8000) and frontend (Next.js :3000).
 # Usage: ./start.sh
 set -euo pipefail
 

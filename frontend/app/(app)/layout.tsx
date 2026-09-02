@@ -12,7 +12,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <header className={styles.header}>
         <div className={styles.brand}>
           <span className={styles.brandMark}>WRCC</span>
-          <span className={styles.brandName}>Content Studio</span>
+          <span className={styles.brandName}>Social Media Marketing</span>
         </div>
         <NavLinks />
         <UserMenu />

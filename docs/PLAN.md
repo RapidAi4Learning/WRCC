@@ -1,4 +1,4 @@
-# WRCC Content Studio — Plan de implementación
+# WRCC Social Media Marketing — Plan de implementación
 
 Proyecto nuevo e independiente en `C:\Projects\wrcc-content-studio` para
 **Western Riverina Community College** (https://wrcc.nsw.edu.au/), reutilizando
