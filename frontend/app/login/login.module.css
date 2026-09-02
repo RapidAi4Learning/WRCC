@@ -61,6 +61,45 @@
   outline: none;
 }
 
+/* The reveal control sits inside the field rather than beside it, so the form
+   keeps its single column and the label still points at the input itself. */
+.passwordField {
+  position: relative;
+  display: flex;
+  margin-bottom: var(--space-4);
+}
+
+.passwordInput {
+  flex: 1;
+  margin-bottom: 0;
+  /* Room for the button, so a long password never runs underneath it. */
+  padding-right: 4.25rem;
+}
+
+.reveal {
+  position: absolute;
+  right: var(--space-1);
+  top: var(--space-1);
+  bottom: var(--space-1);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.reveal:hover {
+  color: var(--color-accent);
+  background: var(--color-surface-sunken);
+}
+
 .error {
   margin: 0 0 var(--space-4);
   color: var(--color-danger);

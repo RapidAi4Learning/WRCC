@@ -95,6 +95,46 @@ describe("Settings — connections", () => {
     ).toBeInTheDocument();
   });
 
+  it("will not let an operator connect a network we cannot post to", async () => {
+    render(<SettingsPage />);
+
+    const linkedin = await screen.findByRole("button", {
+      name: "Connect LinkedIn",
+    });
+    expect(linkedin).toBeDisabled();
+    // The reason sits on the card, and the button points at it.
+    expect(
+      screen.getByText(/LinkedIn publishing is on hold/i),
+    ).toBeInTheDocument();
+    expect(linkedin).toHaveAccessibleDescription(
+      /LinkedIn publishing is on hold/i,
+    );
+  });
+
+  it("leaves the networks we are cleared for alone", async () => {
+    render(<SettingsPage />);
+
+    expect(
+      await screen.findByRole("button", { name: "Connect Facebook" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Connect Instagram" }),
+    ).toBeEnabled();
+  });
+
+  it("keeps an already-connected held account manageable", async () => {
+    mockFetchAccounts.mockResolvedValue([
+      account({ platform: "linkedin", display_name: "WRCC Page" }),
+    ]);
+
+    render(<SettingsPage />);
+
+    // Reconnect is held shut, but nothing strands the existing connection.
+    expect(await screen.findByRole("button", { name: "Reconnect" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Disconnect" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Check connection" })).toBeEnabled();
+  });
+
   it("explains that Instagram needs an image before you connect it", async () => {
     render(<SettingsPage />);
     expect(await screen.findByText(/requires an image/i)).toBeInTheDocument();
@@ -172,7 +212,7 @@ describe("Settings — connections", () => {
     mockAuthorizeUrl.mockRejectedValue(new Error("boom"));
 
     render(<SettingsPage />);
-    fireEvent.click(await screen.findByRole("button", { name: "Connect LinkedIn" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Connect Facebook" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /Could not start the connection/i,

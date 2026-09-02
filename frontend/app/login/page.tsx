@@ -12,6 +12,10 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Typing a password blind is where a failed login usually comes from — on a
+  // phone keyboard especially. Revealing is opt-in and resets on every render
+  // of the page, so nothing is left uncovered on a shared screen.
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -62,15 +66,28 @@ function LoginForm() {
       <label className={styles.label} htmlFor="password">
         Password
       </label>
-      <input
-        id="password"
-        type="password"
-        autoComplete="current-password"
-        required
-        className={styles.input}
-        value={password}
-        onChange={(event) => setPassword(event.target.value)}
-      />
+      <div className={styles.passwordField}>
+        <input
+          id="password"
+          type={isPasswordVisible ? "text" : "password"}
+          autoComplete="current-password"
+          required
+          className={`${styles.input} ${styles.passwordInput}`}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+        <button
+          // Inside a form, so it has to say it is not the submit button.
+          type="button"
+          className={styles.reveal}
+          onClick={() => setIsPasswordVisible((visible) => !visible)}
+          aria-pressed={isPasswordVisible}
+          aria-label={isPasswordVisible ? "Hide password" : "Show password"}
+          aria-controls="password"
+        >
+          {isPasswordVisible ? "Hide" : "Show"}
+        </button>
+      </div>
 
       {error ? (
         <p role="alert" className={styles.error}>

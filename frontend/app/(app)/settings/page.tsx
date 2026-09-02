@@ -18,6 +18,7 @@ import {
 } from "@/lib/api";
 import type { Platform } from "@/types/content";
 import type { SocialAccount } from "@/types/publishing";
+import { publishingHold } from "@/lib/publishing";
 import styles from "./settings.module.css";
 
 const EXPIRY_WARNING_DAYS = 7;
@@ -234,6 +235,13 @@ function PlatformCard({
 }: PlatformCardProps) {
   const isConnected = accounts.length > 0;
   const needsAttention = accounts.some((a) => a.token_expired);
+  // A network we are not cleared to post to is a network there is no point
+  // connecting: the OAuth round trip would fail at the provider, and a
+  // connection that cannot publish is worse than none — it looks ready.
+  // Disconnecting and checking stay open, so an existing connection is never
+  // stranded by a hold arriving later.
+  const hold = publishingHold(platform);
+  const holdId = `${platform}-hold`;
 
   return (
     <article
@@ -266,12 +274,19 @@ function PlatformCard({
         <p className={styles.blurb}>{blurb}</p>
       )}
 
+      {hold ? (
+        <p id={holdId} className={styles.hold}>
+          {hold}
+        </p>
+      ) : null}
+
       <footer className={styles.cardFooter}>
         <button
           type="button"
           className={isConnected ? styles.secondaryButton : styles.primaryButton}
           onClick={onConnect}
-          disabled={busy !== null}
+          disabled={busy !== null || hold !== null}
+          aria-describedby={hold ? holdId : undefined}
         >
           {isConnected ? "Reconnect" : `Connect ${label}`}
         </button>
