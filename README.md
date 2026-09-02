@@ -107,6 +107,13 @@ backend/app/
   `POST /api/courses/sync/{id}/approve` writes the live catalog; `removed`
   always means *deactivate*, never delete. A crawl that yields zero offerings
   fails the run rather than staging a mass-deactivation.
+- **Partial approval**: approve takes an optional `skip` body naming entry codes
+  per changeset section (`{"skip": {"courses_added": ["WHS101"]}}`), so a
+  reviewer can apply part of a changeset and pass over the rest. Only codes are
+  sent — the rows applied are always the ones the server staged. A skipped entry
+  leaves its live row untouched, so the next crawl stages it again. The run keeps
+  the full changeset; the audit row records what was applied and what was
+  skipped.
 - **Generation**: 3 variant styles per platform (`direct`, `story_led`,
   `question_led`), ranked by rule-baseline violations (length/hashtags/CTA per
   platform profile). Reference URLs are fetched best-effort — failures become

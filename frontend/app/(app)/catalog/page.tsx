@@ -130,7 +130,9 @@ export default function CatalogPage() {
           run={pendingRun}
           isBusy={isBusy}
           courseTitles={courseTitles}
-          onApprove={() => void withBusy(() => approveSyncRun(pendingRun.id))}
+          onApprove={(skip) =>
+            void withBusy(() => approveSyncRun(pendingRun.id, skip))
+          }
           onReject={(reason) =>
             void withBusy(() => rejectSyncRun(pendingRun.id, reason))
           }

@@ -100,6 +100,20 @@ export interface StagedOfferingRemoval {
 // from before that change can still be sitting in review.
 export type RemovalEntry<T> = T | string;
 
+export type ChangesetSection =
+  | "courses_added"
+  | "courses_updated"
+  | "courses_removed"
+  | "offerings_added"
+  | "offerings_updated"
+  | "offerings_removed";
+
+/**
+ * Entry codes the reviewer unticked, per section. Only codes travel: the rows
+ * that get applied are always the ones the server staged.
+ */
+export type ChangeSelection = Partial<Record<ChangesetSection, string[]>>;
+
 export interface ChangesetSummary {
   courses_added: number;
   courses_updated: number;

@@ -11,19 +11,17 @@
 
 import type {
   Changeset,
+  ChangeSelection,
+  ChangesetSection,
+  FieldChange,
   RemovalEntry,
   StagedCourseRemoval,
+  StagedOffering,
   StagedOfferingRemoval,
   SyncRun,
 } from "@/types/course";
 
-export type SectionKey =
-  | "courses_added"
-  | "courses_updated"
-  | "courses_removed"
-  | "offerings_added"
-  | "offerings_updated"
-  | "offerings_removed";
+export type SectionKey = ChangesetSection;
 
 // Destructive first: what disappears is what needs the closest look.
 export const SECTION_KEYS: readonly SectionKey[] = [
@@ -201,10 +199,16 @@ export function changesetTotals(changeset: Changeset | null): ChangesetTotals {
   return { total, destructive, isEmpty: total === 0 };
 }
 
-/** The warning above the actions, or null when nothing goes dark. */
-export function destructiveWarning(changeset: Changeset | null): string | null {
-  const courses = sectionCount(changeset, "courses_removed");
-  const dates = sectionCount(changeset, "offerings_removed");
+/**
+ * The warning above the actions, or null when nothing goes dark.
+ *
+ * Takes counts rather than the changeset because what matters is what is still
+ * ticked: untick every deactivation and the warning has to go quiet.
+ */
+export function destructiveWarning(
+  courses: number,
+  dates: number,
+): string | null {
   if (courses === 0 && dates === 0) return null;
 
   const parts: string[] = [];
@@ -257,4 +261,205 @@ export function formatRunTiming(run: SyncRun, now: number = Date.now()): string 
     );
   }
   return parts.join(" · ");
+}
+
+// ── Review rows ──
+//
+// Every section renders the same shape — tick box, course, one line of context
+// or a field diff — so the rows are built here as data and the panel stays a
+// single renderer instead of six near-identical ones.
+
+export interface ReviewItem {
+  /** The code the server filters on when this entry is skipped. */
+  code: string;
+  /** The course this touches, as shown to the operator. */
+  courseCode: string | null;
+  title: string | null;
+  meta: string | null;
+  changes: Record<string, FieldChange> | null;
+}
+
+function metaLine(parts: Array<string | null | undefined>): string | null {
+  const line = parts.filter((part): part is string => Boolean(part)).join(" · ");
+  return line || null;
+}
+
+function plural(count: number, singular: string): string {
+  return `${count} ${count === 1 ? singular : `${singular}s`}`;
+}
+
+function offeringMeta(offering: StagedOffering): string | null {
+  const start = formatDate(offering.start_date);
+  const finish = offering.finish_date;
+  const dates =
+    finish && finish !== offering.start_date
+      ? `${start} → ${formatDate(finish)}`
+      : start;
+  return metaLine([
+    offering.start_date ? dates : "On demand",
+    offering.location,
+    offering.price === null || offering.price === undefined
+      ? null
+      : formatMoney(offering.price),
+    offering.places_available === null || offering.places_available === undefined
+      ? null
+      : plural(offering.places_available, "place"),
+  ]);
+}
+
+export function buildItems(
+  key: SectionKey,
+  changeset: Changeset,
+  courseTitles: Record<string, string>,
+): ReviewItem[] {
+  const nameOf = (code: string | null | undefined) =>
+    code ? courseTitles[code] ?? null : null;
+
+  switch (key) {
+    case "courses_added":
+      return (changeset.courses_added ?? []).map((course) => ({
+        code: course.course_code,
+        courseCode: course.course_code,
+        title: course.title,
+        meta: metaLine([
+          course.category,
+          course.is_accredited ? "Accredited" : null,
+          plural(course.offerings.length, "date"),
+        ]),
+        changes: null,
+      }));
+
+    case "courses_updated":
+      return (changeset.courses_updated ?? []).map((update) => ({
+        code: update.course_code,
+        courseCode: update.course_code,
+        // A renamed course has no live title under the new name yet, so the
+        // old one from the diff is the honest label.
+        title:
+          nameOf(update.course_code) ??
+          (typeof update.changes.title?.from === "string"
+            ? update.changes.title.from
+            : null),
+        meta: null,
+        changes: update.changes,
+      }));
+
+    case "courses_removed":
+      return (changeset.courses_removed ?? []).map((entry) => {
+        const course = removedCourse(entry);
+        return {
+          code: course.course_code,
+          courseCode: course.course_code,
+          title: course.title ?? nameOf(course.course_code),
+          meta: metaLine([
+            course.category,
+            course.offerings_affected > 0
+              ? `${plural(course.offerings_affected, "scheduled date")} go with it`
+              : "no scheduled dates",
+          ]),
+          changes: null,
+        };
+      });
+
+    case "offerings_added":
+      return (changeset.offerings_added ?? []).map((offering) => ({
+        code: offering.offering_code,
+        courseCode: offering.course_code ?? null,
+        title: nameOf(offering.course_code),
+        meta: offeringMeta(offering),
+        changes: null,
+      }));
+
+    case "offerings_updated":
+      return (changeset.offerings_updated ?? []).map((update) => ({
+        code: update.offering_code,
+        courseCode: update.course_code,
+        title: nameOf(update.course_code),
+        meta: null,
+        changes: update.changes,
+      }));
+
+    case "offerings_removed":
+      return (changeset.offerings_removed ?? []).map((entry) => {
+        const offering = removedOffering(entry);
+        return {
+          code: offering.offering_code,
+          courseCode: offering.course_code,
+          title: nameOf(offering.course_code),
+          meta: metaLine([
+            offering.start_date ? formatDate(offering.start_date) : "On demand",
+            offering.location,
+            offering.price === null ? null : formatMoney(offering.price),
+          ]),
+          changes: null,
+        };
+      });
+  }
+}
+
+/** How a row names itself to a screen reader, and in the skip summary. */
+export function itemLabel(item: ReviewItem): string {
+  return [item.courseCode, item.title].filter(Boolean).join(" — ") || item.code;
+}
+
+// ── Selection ──
+//
+// Skips are held as one flat set of "section:code" strings: codes are only
+// unique within their own section, and a flat set keeps toggling a single row
+// from re-rendering the whole panel's worth of nested state.
+
+export function skipKey(section: SectionKey, code: string): string {
+  return `${section}:${code}`;
+}
+
+export function toggleSkip(skipped: Set<string>, key: string): Set<string> {
+  const next = new Set(skipped);
+  if (!next.delete(key)) next.add(key);
+  return next;
+}
+
+export function setSectionSkipped(
+  skipped: Set<string>,
+  section: SectionKey,
+  items: ReviewItem[],
+  skip: boolean,
+): Set<string> {
+  const next = new Set(skipped);
+  for (const item of items) {
+    const key = skipKey(section, item.code);
+    if (skip) next.add(key);
+    else next.delete(key);
+  }
+  return next;
+}
+
+/** Skips for one section, as a plain count. */
+export function countSkipped(
+  skipped: Set<string>,
+  section: SectionKey,
+  items: ReviewItem[],
+): number {
+  return items.filter((item) => skipped.has(skipKey(section, item.code))).length;
+}
+
+/**
+ * The flat set, back in the per-section shape the approve endpoint takes.
+ *
+ * Only sections that actually lost something appear, and an approval with
+ * nothing skipped sends no selection at all — the same request as before.
+ */
+export function buildSkipSelection(
+  skipped: Set<string>,
+): ChangeSelection | undefined {
+  if (skipped.size === 0) return undefined;
+
+  const selection: ChangeSelection = {};
+  for (const entry of skipped) {
+    const separator = entry.indexOf(":");
+    const section = entry.slice(0, separator) as SectionKey;
+    const code = entry.slice(separator + 1);
+    if (!SECTION_KEYS.includes(section)) continue;
+    (selection[section] ??= []).push(code);
+  }
+  return selection;
 }

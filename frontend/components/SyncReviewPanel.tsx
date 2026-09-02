@@ -8,36 +8,35 @@
 // changed field — rather than a row of counters. Counters tell you a sync
 // happened; they cannot tell you whether it is safe to apply.
 //
+// Every row is a tick box, because a reviewer who can only take the changeset
+// whole has no real veto: one wrong price in a 200-row scrape would otherwise
+// force them to throw away 199 good changes. Unticking is "not now" — the live
+// rows stay put, so the next crawl stages the same difference again.
+//
 // Ordering is deliberate: removals sit at the top, because a broken scrape
 // shows up as an unexpected pile of deactivations and that is the failure this
 // review exists to catch.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-import type {
-  Changeset,
-  FieldChange,
-  StagedCourseAdded,
-  StagedCourseUpdate,
-  StagedOffering,
-  StagedOfferingUpdate,
-  SyncRun,
-} from "@/types/course";
+import type { ChangeSelection, FieldChange, SyncRun } from "@/types/course";
 import {
   SECTION_KEYS,
   SECTION_TITLES,
   SECTION_TONES,
-  changesetTotals,
+  buildItems,
+  buildSkipSelection,
+  countSkipped,
   destructiveWarning,
   fieldLabel,
-  formatDate,
   formatFieldValue,
-  formatMoney,
   formatRunTiming,
-  removedCourse,
-  removedOffering,
-  sectionCount,
+  itemLabel,
+  setSectionSkipped,
+  skipKey,
   tallyLabel,
+  toggleSkip,
+  type ReviewItem,
   type SectionKey,
 } from "@/lib/syncChangeset";
 import styles from "./SyncReviewPanel.module.css";
@@ -52,12 +51,13 @@ interface SyncReviewPanelProps {
   isBusy: boolean;
   /** Live course code → title, so a change can name the course it touches. */
   courseTitles: Record<string, string>;
-  onApprove: () => void;
+  onApprove: (skip?: ChangeSelection) => void;
   onReject: (reason?: string) => void;
 }
 
-function metaLine(parts: Array<string | null | undefined>): string {
-  return parts.filter((part): part is string => Boolean(part)).join(" · ");
+interface Section {
+  key: SectionKey;
+  items: ReviewItem[];
 }
 
 function FieldDiffs({ changes }: { changes: Record<string, FieldChange> }) {
@@ -79,170 +79,107 @@ function FieldDiffs({ changes }: { changes: Record<string, FieldChange> }) {
   );
 }
 
-function ItemHead({ code, name }: { code: string | null; name?: string | null }) {
+function ItemRow({
+  item,
+  isSkipped,
+  isBusy,
+  onToggle,
+}: {
+  item: ReviewItem;
+  isSkipped: boolean;
+  isBusy: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <p className={styles.itemHead}>
-      <span className={styles.code}>{code ?? "Unknown"}</span>
-      {name ? <span className={styles.itemTitle}>{name}</span> : null}
-    </p>
+    <li className={styles.item} data-skipped={isSkipped}>
+      <label className={styles.tick}>
+        <input
+          type="checkbox"
+          checked={!isSkipped}
+          onChange={onToggle}
+          disabled={isBusy}
+          aria-label={`Apply ${itemLabel(item)}`}
+        />
+      </label>
+      <div className={styles.itemBody}>
+        <p className={styles.itemHead}>
+          <span className={styles.code}>{item.courseCode ?? item.code}</span>
+          {item.title ? (
+            <span className={styles.itemTitle}>{item.title}</span>
+          ) : null}
+          {isSkipped ? <span className={styles.skipTag}>Skipped</span> : null}
+        </p>
+        {item.meta ? <p className={styles.itemMeta}>{item.meta}</p> : null}
+        {item.changes ? <FieldDiffs changes={item.changes} /> : null}
+      </div>
+    </li>
   );
 }
 
-function offeringMeta(offering: StagedOffering): string {
-  const start = formatDate(offering.start_date);
-  const finish = offering.finish_date;
-  const dates =
-    finish && finish !== offering.start_date
-      ? `${start} → ${formatDate(finish)}`
-      : start;
-  return metaLine([
-    offering.start_date ? dates : "On demand",
-    offering.location,
-    offering.price !== null && offering.price !== undefined
-      ? formatMoney(offering.price)
-      : null,
-    offering.places_available !== null && offering.places_available !== undefined
-      ? `${offering.places_available} places`
-      : null,
-  ]);
-}
-
-function renderItems(
-  key: SectionKey,
-  changeset: Changeset,
-  courseTitles: Record<string, string>,
-): JSX.Element[] {
-  const nameOf = (code: string | null | undefined) =>
-    code ? courseTitles[code] ?? null : null;
-
-  switch (key) {
-    case "courses_added":
-      return (changeset.courses_added ?? []).map((course: StagedCourseAdded) => (
-        <li key={course.course_code} className={styles.item}>
-          <ItemHead code={course.course_code} name={course.title} />
-          <p className={styles.itemMeta}>
-            {metaLine([
-              course.category,
-              course.is_accredited ? "Accredited" : null,
-              `${course.offerings.length} ${
-                course.offerings.length === 1 ? "date" : "dates"
-              }`,
-            ])}
-          </p>
-        </li>
-      ));
-
-    case "courses_updated":
-      return (changeset.courses_updated ?? []).map((update: StagedCourseUpdate) => (
-        <li key={update.course_code} className={styles.item}>
-          <ItemHead
-            code={update.course_code}
-            // A renamed course has no live title under the new name yet, so the
-            // old one from the diff is the honest label.
-            name={
-              nameOf(update.course_code) ??
-              (typeof update.changes.title?.from === "string"
-                ? update.changes.title.from
-                : null)
-            }
-          />
-          <FieldDiffs changes={update.changes} />
-        </li>
-      ));
-
-    case "courses_removed":
-      return (changeset.courses_removed ?? []).map((entry) => {
-        const course = removedCourse(entry);
-        return (
-          <li key={course.course_code} className={styles.item}>
-            <ItemHead
-              code={course.course_code}
-              name={course.title ?? nameOf(course.course_code)}
-            />
-            <p className={styles.itemMeta}>
-              {metaLine([
-                course.category,
-                course.offerings_affected > 0
-                  ? `${course.offerings_affected} scheduled ${
-                      course.offerings_affected === 1 ? "date" : "dates"
-                    } go with it`
-                  : "no scheduled dates",
-              ])}
-            </p>
-          </li>
-        );
-      });
-
-    case "offerings_added":
-      return (changeset.offerings_added ?? []).map((offering) => (
-        <li key={offering.offering_code} className={styles.item}>
-          <ItemHead
-            code={offering.course_code ?? null}
-            name={nameOf(offering.course_code)}
-          />
-          <p className={styles.itemMeta}>{offeringMeta(offering)}</p>
-        </li>
-      ));
-
-    case "offerings_updated":
-      return (changeset.offerings_updated ?? []).map(
-        (update: StagedOfferingUpdate) => (
-          <li key={update.offering_code} className={styles.item}>
-            <ItemHead
-              code={update.course_code}
-              name={nameOf(update.course_code)}
-            />
-            <FieldDiffs changes={update.changes} />
-          </li>
-        ),
-      );
-
-    case "offerings_removed":
-      return (changeset.offerings_removed ?? []).map((entry) => {
-        const offering = removedOffering(entry);
-        return (
-          <li key={offering.offering_code} className={styles.item}>
-            <ItemHead
-              code={offering.course_code}
-              name={nameOf(offering.course_code)}
-            />
-            <p className={styles.itemMeta}>
-              {metaLine([
-                offering.start_date ? formatDate(offering.start_date) : "On demand",
-                offering.location,
-                offering.price !== null ? formatMoney(offering.price) : null,
-              ])}
-            </p>
-          </li>
-        );
-      });
-  }
-}
-
-function Section({
-  sectionKey,
-  items,
+function SectionBlock({
+  section,
+  skipped,
+  isBusy,
+  onToggleItem,
+  onToggleSection,
 }: {
-  sectionKey: SectionKey;
-  items: JSX.Element[];
+  section: Section;
+  skipped: Set<string>;
+  isBusy: boolean;
+  onToggleItem: (key: string) => void;
+  onToggleSection: (section: Section, skip: boolean) => void;
 }) {
+  const { key, items } = section;
   const [isOpen, setIsOpen] = useState(items.length <= AUTO_OPEN_MAX);
   const [showAll, setShowAll] = useState(false);
+
+  const skippedHere = countSkipped(skipped, key, items);
+  const allSkipped = skippedHere === items.length;
   const visible = showAll ? items : items.slice(0, INITIAL_VISIBLE);
   const hidden = items.length - visible.length;
 
   return (
     <details
       className={styles.section}
-      data-tone={SECTION_TONES[sectionKey]}
+      data-tone={SECTION_TONES[key]}
       open={isOpen}
       onToggle={(event) => setIsOpen(event.currentTarget.open)}
     >
       <summary className={styles.sectionSummary}>
-        <span className={styles.sectionTitle}>{SECTION_TITLES[sectionKey]}</span>
-        <span className={styles.sectionCount}>{items.length}</span>
+        <span className={styles.sectionTitle}>{SECTION_TITLES[key]}</span>
+        <span className={styles.sectionCount}>
+          {skippedHere > 0
+            ? `${items.length - skippedHere} of ${items.length}`
+            : items.length}
+        </span>
+        <button
+          type="button"
+          className={styles.bulk}
+          disabled={isBusy}
+          // Inside a summary, so the click must not also fold the section.
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onToggleSection(section, !allSkipped);
+          }}
+        >
+          {allSkipped ? "Include all" : "Skip all"}
+        </button>
       </summary>
-      <ul className={styles.items}>{visible}</ul>
+      <ul className={styles.items}>
+        {visible.map((item) => {
+          const itemKey = skipKey(key, item.code);
+          return (
+            <ItemRow
+              key={itemKey}
+              item={item}
+              isSkipped={skipped.has(itemKey)}
+              isBusy={isBusy}
+              onToggle={() => onToggleItem(itemKey)}
+            />
+          );
+        })}
+      </ul>
       {hidden > 0 ? (
         <button
           type="button"
@@ -263,13 +200,47 @@ export default function SyncReviewPanel({
   onApprove,
   onReject,
 }: SyncReviewPanelProps) {
+  // Entry keys the reviewer unticked. Empty means "apply the lot", which is
+  // what an approve has always been.
+  const [skipped, setSkipped] = useState<Set<string>>(new Set());
   // `null` means the reject form is closed; a string is the reason so far.
   const [reason, setReason] = useState<string | null>(null);
 
   const changeset = run.changeset ?? {};
-  const { total, isEmpty } = changesetTotals(changeset);
-  const warning = destructiveWarning(changeset);
-  const populated = SECTION_KEYS.filter((key) => sectionCount(changeset, key) > 0);
+  const sections: Section[] = useMemo(
+    () =>
+      SECTION_KEYS.map((key) => ({
+        key,
+        items: buildItems(key, changeset, courseTitles),
+      })).filter((section) => section.items.length > 0),
+    [changeset, courseTitles],
+  );
+
+  const staged = sections.reduce((sum, s) => sum + s.items.length, 0);
+  const skippedCount = sections.reduce(
+    (sum, s) => sum + countSkipped(skipped, s.key, s.items),
+    0,
+  );
+  const selected = staged - skippedCount;
+
+  const selectedIn = (key: SectionKey) => {
+    const section = sections.find((candidate) => candidate.key === key);
+    if (!section) return 0;
+    return section.items.length - countSkipped(skipped, key, section.items);
+  };
+
+  const warning = destructiveWarning(
+    selectedIn("courses_removed"),
+    selectedIn("offerings_removed"),
+  );
+  const isEmpty = staged === 0;
+  const nothingSelected = staged > 0 && selected === 0;
+
+  const approveLabel = isEmpty
+    ? "Close out this run"
+    : skippedCount === 0
+      ? `Approve & apply ${staged} ${staged === 1 ? "change" : "changes"}`
+      : `Approve & apply ${selected} of ${staged} changes`;
 
   return (
     <section className={styles.panel} aria-labelledby="sync-review-heading">
@@ -278,28 +249,24 @@ export default function SyncReviewPanel({
         <h2 id="sync-review-heading" className={styles.headline}>
           {isEmpty
             ? "No changes — the site already matches this catalog"
-            : `${total} ${total === 1 ? "change" : "changes"} staged`}
+            : `${staged} ${staged === 1 ? "change" : "changes"} staged`}
         </h2>
         <p className={styles.meta}>
-          {metaLine([
-            `Crawled ${run.courses_found} courses · ${run.offerings_found} dates`,
-            formatRunTiming(run),
-          ])}
+          {`Crawled ${run.courses_found} courses · ${run.offerings_found} dates · ${formatRunTiming(run)}`}
         </p>
       </header>
 
-      {populated.length > 0 ? (
+      {sections.length > 0 ? (
         <ul className={styles.tallies}>
-          {populated.map((key) => {
-            const count = sectionCount(changeset, key);
+          {sections.map(({ key, items }) => {
+            const kept = items.length - countSkipped(skipped, key, items);
             return (
-              <li
-                key={key}
-                className={styles.tally}
-                data-tone={SECTION_TONES[key]}
-              >
-                <span className={styles.tallyCount}>{count}</span>
-                <span className={styles.tallyLabel}>{tallyLabel(key, count)}</span>
+              <li key={key} className={styles.tally} data-tone={SECTION_TONES[key]}>
+                <span className={styles.tallyCount}>{kept}</span>
+                {kept !== items.length ? (
+                  <span className={styles.tallyOf}>of {items.length}</span>
+                ) : null}
+                <span className={styles.tallyLabel}>{tallyLabel(key, kept)}</span>
               </li>
             );
           })}
@@ -312,13 +279,22 @@ export default function SyncReviewPanel({
         </p>
       ) : null}
 
-      {populated.length > 0 ? (
+      {sections.length > 0 ? (
         <div className={styles.sections}>
-          {populated.map((key) => (
-            <Section
-              key={key}
-              sectionKey={key}
-              items={renderItems(key, changeset, courseTitles)}
+          {sections.map((section) => (
+            <SectionBlock
+              key={section.key}
+              section={section}
+              skipped={skipped}
+              isBusy={isBusy}
+              onToggleItem={(key) =>
+                setSkipped((previous) => toggleSkip(previous, key))
+              }
+              onToggleSection={(target, skip) =>
+                setSkipped((previous) =>
+                  setSectionSkipped(previous, target.key, target.items, skip),
+                )
+              }
             />
           ))}
         </div>
@@ -328,17 +304,23 @@ export default function SyncReviewPanel({
         </p>
       )}
 
+      {skippedCount > 0 ? (
+        <p className={styles.skipNote}>
+          {skippedCount === 1 ? "1 change stays" : `${skippedCount} changes stay`} as
+          they are. Skipping is not a decision against them — the next sync finds
+          the same difference upstream and stages it again.
+        </p>
+      ) : null}
+
       {reason === null ? (
         <div className={styles.actions}>
           <button
             type="button"
             className={styles.approve}
-            onClick={onApprove}
-            disabled={isBusy}
+            onClick={() => onApprove(buildSkipSelection(skipped))}
+            disabled={isBusy || nothingSelected}
           >
-            {isEmpty
-              ? "Close out this run"
-              : `Approve & apply ${total} ${total === 1 ? "change" : "changes"}`}
+            {approveLabel}
           </button>
           <button
             type="button"
@@ -348,6 +330,11 @@ export default function SyncReviewPanel({
           >
             Reject
           </button>
+          {nothingSelected ? (
+            <span className={styles.actionHint}>
+              Nothing is ticked — reject the run instead.
+            </span>
+          ) : null}
         </div>
       ) : (
         <form

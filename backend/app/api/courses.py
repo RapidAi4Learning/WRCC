@@ -68,6 +68,22 @@ class SyncRunOut(BaseModel):
     created_at: dt.datetime
 
 
+class ChangeSelection(BaseModel):
+    """Entry codes the reviewer unticked, per changeset section."""
+
+    courses_added: list[str] = []
+    courses_updated: list[str] = []
+    courses_removed: list[str] = []
+    offerings_added: list[str] = []
+    offerings_updated: list[str] = []
+    offerings_removed: list[str] = []
+
+
+class ApproveRequest(BaseModel):
+    # Absent means "apply everything", which is what an approve has always been.
+    skip: ChangeSelection | None = None
+
+
 class RejectRequest(BaseModel):
     reason: str | None = None
 
@@ -162,11 +178,15 @@ async def get_sync_run(
 @router.post("/sync/{run_id}/approve", response_model=SyncRunOut)
 async def approve_sync_run(
     run_id: uuid.UUID,
+    body: ApproveRequest | None = None,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> SyncRunOut:
+    skipped = body.skip.model_dump() if body and body.skip else None
     try:
-        run = await CourseSyncReviewService(session).approve(run_id, actor_id=user.id)
+        run = await CourseSyncReviewService(session).approve(
+            run_id, actor_id=user.id, skipped=skipped
+        )
     except RunNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except InvalidRunTransitionError as exc:

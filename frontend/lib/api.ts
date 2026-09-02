@@ -12,7 +12,12 @@ import type {
   Platform,
   WorkflowAction,
 } from "@/types/content";
-import type { Course, CourseDetail, SyncRun } from "@/types/course";
+import type {
+  ChangeSelection,
+  Course,
+  CourseDetail,
+  SyncRun,
+} from "@/types/course";
 import type {
   AccountVerification,
   AuthorizeUrl,
@@ -248,8 +253,14 @@ export function fetchSyncRun(runId: string): Promise<SyncRun> {
   return request<SyncRun>(`/api/courses/sync/${runId}`);
 }
 
-export function approveSyncRun(runId: string): Promise<SyncRun> {
-  return request<SyncRun>(`/api/courses/sync/${runId}/approve`, { method: "POST" });
+export function approveSyncRun(
+  runId: string,
+  skip?: ChangeSelection,
+): Promise<SyncRun> {
+  return request<SyncRun>(`/api/courses/sync/${runId}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ skip: skip ?? null }),
+  });
 }
 
 export function rejectSyncRun(runId: string, reason?: string): Promise<SyncRun> {

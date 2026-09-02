@@ -202,3 +202,109 @@ async def test_legacy_removed_codes_still_apply(db_sessionmaker) -> None:
 
     assert course.is_active is False
     assert offering.is_active is False
+
+
+async def test_approve_skips_the_entries_the_reviewer_unticked(
+    auth_client: AsyncClient, sync_service: SyncService, db_sessionmaker
+) -> None:
+    """Partial approval writes the kept rows and leaves the skipped ones alone."""
+    run = await _run_sync(auth_client, sync_service)
+    added = run["changeset"]["courses_added"]
+    kept, skipped = added[0]["course_code"], added[1]["course_code"]
+
+    response = await auth_client.post(
+        f"/api/courses/sync/{run['id']}/approve",
+        json={"skip": {"courses_added": [skipped]}},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "approved"
+
+    codes = {
+        course["course_code"]
+        for course in (await auth_client.get("/api/courses")).json()
+    }
+    assert kept in codes
+    assert skipped not in codes
+
+    # The run still records everything the crawl saw, not just what was applied.
+    detail = (await auth_client.get(f"/api/courses/sync/{run['id']}")).json()
+    staged = {c["course_code"] for c in detail["changeset"]["courses_added"]}
+    assert {kept, skipped} <= staged
+
+
+async def test_skipped_entries_are_staged_again_by_the_next_sync(
+    auth_client: AsyncClient, sync_service: SyncService
+) -> None:
+    """Unticking is 'not now': the upstream difference is still there."""
+    run = await _run_sync(auth_client, sync_service)
+    skipped = run["changeset"]["courses_added"][0]["course_code"]
+
+    await auth_client.post(
+        f"/api/courses/sync/{run['id']}/approve",
+        json={"skip": {"courses_added": [skipped]}},
+    )
+
+    rerun = await _run_sync(auth_client, sync_service)
+    restaged = {c["course_code"] for c in rerun["changeset"]["courses_added"]}
+    assert restaged == {skipped}
+
+
+async def test_approve_records_what_was_applied_and_what_was_passed_over(
+    auth_client: AsyncClient, sync_service: SyncService, db_sessionmaker
+) -> None:
+    run = await _run_sync(auth_client, sync_service)
+    skipped = run["changeset"]["courses_added"][0]["course_code"]
+    staged_count = run["changeset"]["summary"]["courses_added"]
+
+    await auth_client.post(
+        f"/api/courses/sync/{run['id']}/approve",
+        json={"skip": {"courses_added": [skipped]}},
+    )
+
+    async with db_sessionmaker() as session:
+        entry = next(
+            log
+            for log in (await session.execute(select(AuditLog))).scalars()
+            if log.action == "catalog_sync_approved"
+        )
+        diff = entry.payload_diff
+
+    assert diff["skipped"] == {"courses_added": [skipped]}
+    assert diff["skipped_count"] == 1
+    assert diff["staged"]["courses_added"] == staged_count
+    assert diff["applied"]["courses_added"] == staged_count - 1
+
+
+async def test_approve_without_a_body_still_applies_everything(
+    auth_client: AsyncClient, sync_service: SyncService
+) -> None:
+    """The old whole-changeset approve is still exactly what an empty call does."""
+    run = await _run_sync(auth_client, sync_service)
+    staged = {c["course_code"] for c in run["changeset"]["courses_added"]}
+
+    await auth_client.post(f"/api/courses/sync/{run['id']}/approve")
+
+    codes = {
+        course["course_code"]
+        for course in (await auth_client.get("/api/courses")).json()
+    }
+    assert staged <= codes
+
+
+async def test_unknown_skip_codes_are_ignored_rather_than_failing(
+    auth_client: AsyncClient, sync_service: SyncService
+) -> None:
+    run = await _run_sync(auth_client, sync_service)
+    staged = {c["course_code"] for c in run["changeset"]["courses_added"]}
+
+    response = await auth_client.post(
+        f"/api/courses/sync/{run['id']}/approve",
+        json={"skip": {"courses_added": ["NOT-IN-THIS-RUN"]}},
+    )
+    assert response.status_code == 200
+
+    codes = {
+        course["course_code"]
+        for course in (await auth_client.get("/api/courses")).json()
+    }
+    assert staged <= codes

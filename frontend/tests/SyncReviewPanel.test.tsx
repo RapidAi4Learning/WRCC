@@ -179,9 +179,9 @@ describe("SyncReviewPanel", () => {
       ],
     });
 
-    const button = screen.getByRole("button", { name: "Approve & apply 1 change" });
-    fireEvent.click(button);
-    expect(onApprove).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Approve & apply 1 change" }));
+    // Nothing was unticked, so this is the same request as before selection.
+    expect(onApprove).toHaveBeenCalledWith(undefined);
   });
 
   it("treats an empty changeset as a no-op rather than an approval", () => {
@@ -253,5 +253,153 @@ describe("SyncReviewPanel", () => {
 
     expect(screen.getByRole("button", { name: /Approve & apply/ })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Reject" })).toBeDisabled();
+  });
+});
+
+describe("SyncReviewPanel selection", () => {
+  const twoCourses: Changeset = {
+    courses_added: [
+      {
+        course_code: "WHS101",
+        title: "Work Health & Safety",
+        category: null,
+        description: null,
+        is_accredited: false,
+        source_url: null,
+        offerings: [],
+      },
+      {
+        course_code: "WHS102",
+        title: "Working at Heights",
+        category: null,
+        description: null,
+        is_accredited: false,
+        source_url: null,
+        offerings: [],
+      },
+    ],
+  };
+
+  function tick(name: string): HTMLElement {
+    return screen.getByRole("checkbox", { name });
+  }
+
+  it("starts with every change ticked", () => {
+    renderPanel(twoCourses);
+
+    expect(tick("Apply WHS101 — Work Health & Safety")).toBeChecked();
+    expect(tick("Apply WHS102 — Working at Heights")).toBeChecked();
+  });
+
+  it("sends only the unticked codes to the server", () => {
+    const { onApprove } = renderPanel(twoCourses);
+
+    fireEvent.click(tick("Apply WHS102 — Working at Heights"));
+    fireEvent.click(screen.getByRole("button", { name: /Approve & apply/ }));
+
+    expect(onApprove).toHaveBeenCalledWith({ courses_added: ["WHS102"] });
+  });
+
+  it("counts what will actually be applied on the button", () => {
+    renderPanel(twoCourses);
+
+    fireEvent.click(tick("Apply WHS102 — Working at Heights"));
+    expect(
+      screen.getByRole("button", { name: "Approve & apply 1 of 2 changes" }),
+    ).toBeInTheDocument();
+  });
+
+  it("explains that a skipped change comes back on the next sync", () => {
+    renderPanel(twoCourses);
+
+    expect(screen.queryByText(/stages it again/)).not.toBeInTheDocument();
+    fireEvent.click(tick("Apply WHS101 — Work Health & Safety"));
+    expect(screen.getByText(/1 change stays as/)).toBeInTheDocument();
+    expect(screen.getByText(/stages it again/)).toBeInTheDocument();
+  });
+
+  it("re-ticks a change that was unticked by mistake", () => {
+    const { onApprove } = renderPanel(twoCourses);
+    const box = tick("Apply WHS102 — Working at Heights");
+
+    fireEvent.click(box);
+    fireEvent.click(box);
+    fireEvent.click(screen.getByRole("button", { name: /Approve & apply/ }));
+
+    expect(onApprove).toHaveBeenCalledWith(undefined);
+  });
+
+  it("drops a whole section in one click, and puts it back", () => {
+    const { onApprove } = renderPanel(twoCourses);
+
+    fireEvent.click(screen.getByRole("button", { name: "Skip all" }));
+    expect(tick("Apply WHS101 — Work Health & Safety")).not.toBeChecked();
+    expect(tick("Apply WHS102 — Working at Heights")).not.toBeChecked();
+
+    fireEvent.click(screen.getByRole("button", { name: "Include all" }));
+    fireEvent.click(screen.getByRole("button", { name: /Approve & apply/ }));
+    expect(onApprove).toHaveBeenCalledWith(undefined);
+  });
+
+  it("points at Reject rather than approving nothing", () => {
+    renderPanel(twoCourses);
+
+    fireEvent.click(screen.getByRole("button", { name: "Skip all" }));
+
+    expect(screen.getByRole("button", { name: /Approve & apply/ })).toBeDisabled();
+    expect(screen.getByText(/Nothing is ticked/)).toBeInTheDocument();
+  });
+
+  it("goes quiet about removals once they are all unticked", () => {
+    renderPanel({
+      courses_removed: [
+        {
+          course_code: "HLTAID011",
+          title: "Provide First Aid",
+          category: null,
+          offerings_affected: 0,
+        },
+      ],
+    });
+
+    expect(screen.getByText(/Removals in this changeset/)).toBeInTheDocument();
+    fireEvent.click(tick("Apply HLTAID011 — Provide First Aid"));
+    expect(screen.queryByText(/Removals in this changeset/)).not.toBeInTheDocument();
+  });
+
+  it("keys a date row by its own code, not by the course it hangs off", () => {
+    // Two dates on one course: unticking one must not take the other with it.
+    const { onApprove } = renderPanel(
+      {
+        offerings_removed: [
+          {
+            offering_code: "9001",
+            course_code: "HLTAID011",
+            start_date: "2026-08-07",
+            location: "Griffith",
+            price: null,
+          },
+          {
+            offering_code: "9002",
+            course_code: "HLTAID011",
+            start_date: "2026-09-04",
+            location: "Leeton",
+            price: null,
+          },
+        ],
+      },
+      { courseTitles: { HLTAID011: "Provide First Aid" } },
+    );
+
+    const boxes = screen.getAllByRole("checkbox", {
+      name: "Apply HLTAID011 — Provide First Aid",
+    });
+    expect(boxes).toHaveLength(2);
+
+    fireEvent.click(boxes[0]);
+    expect(boxes[1]).toBeChecked();
+
+    fireEvent.click(screen.getByRole("button", { name: /Approve & apply/ }));
+    expect(onApprove).toHaveBeenCalledWith({ offerings_removed: ["9001"] });
   });
 });
