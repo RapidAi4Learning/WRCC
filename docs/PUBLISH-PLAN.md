@@ -16,8 +16,9 @@ attempt.
 
 - Connect the WRCC Facebook Page, its linked Instagram Business account, and
   the WRCC LinkedIn Company Page through an in-app OAuth flow.
-- Publish one approved item (text + optionally one generated image) to its
-  platform, on demand.
+- Publish one approved item (text + optionally an image) to its platform, on
+  demand. *Several* images — a Facebook multi-photo story, an Instagram
+  carousel, a LinkedIn multi-image post — arrived later with D12.
 - Per-attempt history: what was sent, the remote post id, the permalink, or the
   error — surfaced in the UI, written to `audit_logs`.
 - Preflight validation so a post is rejected by us, with a readable reason,
@@ -27,7 +28,8 @@ attempt.
 
 - Scheduling / a "publish at 9am Tuesday" queue — see §12 for what to leave
   open so it drops in later.
-- Carousels, stories, reels, video, link-preview customisation.
+- ~~Carousels~~ — brought in by [`docs/MEDIA-PLAN.md`](MEDIA-PLAN.md) (D12).
+  Stories, reels, video and link-preview customisation remain out.
 - Analytics, comment ingestion, reply management.
 - Deleting or editing a post after it has gone out.
 

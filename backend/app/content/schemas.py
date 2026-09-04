@@ -76,13 +76,59 @@ class GenerateImageRequest(BaseModel):
     prompt: str = Field(min_length=3, max_length=2000)
 
 
-class ContentImageOut(BaseModel):
+class MediaAssetOut(BaseModel):
     id: str
-    content_item_id: str
-    prompt: str
-    model: str
+    # "generated" or "uploaded" — the UI badges them differently, and only one
+    # of the two has a prompt.
+    source: str
+    prompt: str | None
+    model: str | None
+    filename: str | None
+    mime_type: str
+    width: int
+    height: int
+    byte_size: int
+    alt_text: str | None
     created_at: dt.datetime
     file_url: str  # relative API path; the client prefixes its API base
+
+
+class ItemMediaOut(BaseModel):
+    """One entry in a post's ordered selection."""
+
+    media_asset_id: str
+    position: int
+    alt_text: str | None
+
+
+class MediaLibraryOut(BaseModel):
+    """Everything the media panel needs in one round trip.
+
+    ``library`` is the whole generation group — assets belonging to sibling
+    platforms included, which is the point of the group scope — while
+    ``selection`` is only what this post sends, in order.
+    """
+
+    library: list[MediaAssetOut]
+    selection: list[ItemMediaOut]
+    # The platform ceiling, so the panel can disable the checkbox rather than
+    # letting the operator build a selection the server will refuse.
+    max_images: int
+
+
+class SetSelectionRequest(BaseModel):
+    asset_ids: list[uuid.UUID] = Field(default_factory=list)
+    # Copy this selection onto the other platforms of the same generation.
+    # An action, not a schema property: the selections stay independent
+    # afterwards, so LinkedIn can be given a different set.
+    apply_to_group: bool = False
+
+
+class SetSelectionResponse(BaseModel):
+    selection: list[ItemMediaOut]
+    # Siblings that could not take the selection, named rather than silently
+    # trimmed.
+    warnings: list[str] = Field(default_factory=list)
 
 
 class ImageSuggestionsResponse(BaseModel):

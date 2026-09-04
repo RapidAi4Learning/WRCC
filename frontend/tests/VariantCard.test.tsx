@@ -28,9 +28,14 @@ vi.mock("@/lib/api", () => ({
   fetchPublications: mockFetchPublications,
   fetchPublishPreflight: mockPreflight,
   publishContent: mockPublish,
-  fetchImages: vi.fn().mockResolvedValue([]),
+  fetchMedia: vi
+    .fn()
+    .mockResolvedValue({ library: [], selection: [], max_images: 10 }),
   fetchImageSuggestions: vi.fn().mockResolvedValue({ prompts: [] }),
   generateImage: vi.fn(),
+  uploadMedia: vi.fn(),
+  saveMediaSelection: vi.fn(),
+  deleteMediaAsset: vi.fn(),
   imageFileUrl: () => "http://api.test/image.png",
 }));
 
@@ -115,7 +120,7 @@ describe("VariantCard publishing", () => {
       id: "pub-1",
       content_item_id: "item-1",
       social_account_id: "acct-1",
-      content_image_id: null,
+      media_asset_ids: [],
       status: "succeeded",
       external_post_id: "page-1_999",
       permalink: "https://facebook.com/page-1_999",

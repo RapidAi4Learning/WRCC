@@ -94,6 +94,14 @@ class Settings(BaseSettings):
     image_size: str = "1024x1024"
     image_quality: Literal["low", "medium", "high", "auto"] = "medium"
 
+    # ── Uploaded media (D10 — normalised at ingest, see app/content/ingest.py) ──
+    media_upload_max_bytes: int = 10 * 1024 * 1024
+    # Bounds one generation group's share of the database. A drag-and-drop of a
+    # whole folder is a slip, not a plan.
+    media_max_assets_per_group: int = 40
+    # Long edge after normalisation; larger than any network renders.
+    media_max_dimension: int = 2048
+
     # ── Scraper (politeness + bounded retries) ──
     scraper_base_url: str = "https://wrcc.nsw.edu.au"
     scraper_request_delay_ms: int = 500
@@ -131,7 +139,10 @@ class Settings(BaseSettings):
     # Signs public image URLs. Deliberately separate from auth_secret: leaking
     # the one that signs images must not let anyone forge a session.
     media_signing_secret: str = ""
-    media_url_ttl_seconds: int = 900
+    # Long enough to build a ten-child Instagram carousel: every child URL is
+    # signed from one clock at the start of the request, and the last one must
+    # still be valid when Meta fetches it.
+    media_url_ttl_seconds: int = 1800
     publish_timeout_seconds: float = 30.0
     publish_max_attempts: int = 3
     # Exponential backoff base between retries of a throttled/transient call.

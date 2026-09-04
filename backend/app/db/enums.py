@@ -21,6 +21,18 @@ class ContentPlatform(enum.StrEnum):
     linkedin = "linkedin"
 
 
+class MediaSource(enum.StrEnum):
+    """Where a media asset's bytes came from.
+
+    The distinction is not cosmetic: a generated asset always has a prompt and
+    a model, an uploaded one never does, and only uploaded bytes have passed
+    through the ingest pipeline in ``app.content.media``.
+    """
+
+    generated = "generated"
+    uploaded = "uploaded"
+
+
 class ContentStatus(enum.StrEnum):
     """HITL workflow states for a generated content item."""
 

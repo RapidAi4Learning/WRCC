@@ -38,7 +38,8 @@ export interface Publication {
   id: string;
   content_item_id: string;
   social_account_id: string | null;
-  content_image_id: string | null;
+  // Exactly what went out, in order.
+  media_asset_ids: string[];
   status: PublishStatus;
   external_post_id: string | null;
   permalink: string | null;
@@ -58,7 +59,9 @@ export interface PublishPreflight {
   char_count: number;
   char_limit: number;
   hashtag_count: number;
-  image_id: string | null;
+  // The selection this preflight evaluated, in publish order.
+  image_ids: string[];
   image_required: boolean;
+  max_images: number;
   account: SocialAccount | null;
 }

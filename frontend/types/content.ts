@@ -45,13 +45,44 @@ export interface GenerateContentResult {
   warnings: string[];
 }
 
-export interface ContentImage {
+// Where an asset's bytes came from. Uploaded ones have a filename and no
+// prompt; generated ones the reverse.
+export type MediaSource = "generated" | "uploaded";
+
+export interface MediaAsset {
   id: string;
-  content_item_id: string;
-  prompt: string;
-  model: string;
+  source: MediaSource;
+  prompt: string | null;
+  model: string | null;
+  filename: string | null;
+  mime_type: string;
+  width: number;
+  height: number;
+  byte_size: number;
+  alt_text: string | null;
   created_at: string;
   file_url: string;
+}
+
+// One entry in a post's ordered selection. Position is the carousel sequence.
+export interface ItemMedia {
+  media_asset_id: string;
+  position: number;
+  alt_text: string | null;
+}
+
+export interface MediaLibrary {
+  // The whole generation group, sibling platforms included.
+  library: MediaAsset[];
+  // Only what this post sends, in order.
+  selection: ItemMedia[];
+  max_images: number;
+}
+
+export interface SetSelectionResult {
+  selection: ItemMedia[];
+  // Siblings `apply_to_group` could not update, named rather than trimmed.
+  warnings: string[];
 }
 
 export interface ImageSuggestions {

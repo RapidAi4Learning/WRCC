@@ -17,7 +17,7 @@ import { publishingHold } from "@/lib/publishing";
 import type { ContentItem, WorkflowAction } from "@/types/content";
 import type { Publication } from "@/types/publishing";
 import { PlatformBadge, StatusBadge } from "@/components/Badges";
-import ImagePanel from "@/components/ImagePanel";
+import MediaPanel from "@/components/MediaPanel";
 import PublishDialog from "@/components/PublishDialog";
 import styles from "./VariantCard.module.css";
 
@@ -304,7 +304,7 @@ export default function VariantCard({
           ))}
       </footer>
 
-      <ImagePanel itemId={item.id} />
+      <MediaPanel itemId={item.id} />
 
       {hold && item.status === "approved" ? (
         <p className={styles.hold}>{hold}</p>

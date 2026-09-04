@@ -70,9 +70,10 @@ async def test_generate_stores_image_and_serves_file(
     )
     assert response.status_code == 200, response.text
     image = response.json()
-    assert image["content_item_id"] == item_id
+    assert image["source"] == "generated"
     assert image["prompt"].startswith("Adult learners")
     assert image["model"] == "mock"
+    assert image["mime_type"] == "image/png"
     assert image["file_url"] == f"/api/content/images/{image['id']}/file"
 
     file_response = await auth_client.get(image["file_url"])

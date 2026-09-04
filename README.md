@@ -10,8 +10,14 @@ Social content generation + course catalog studio for
 - **History** — every generated variant is persisted with an approval workflow
   (`draft → pending_approval → approved/rejected`, plus edit / archive /
   restore / duplicate / regenerate), all audited.
+- **Media** — generate images with the LLM **or upload your own**, from two
+  clearly separate actions. Assets belong to the whole generation, so a photo
+  uploaded for the Facebook variant is available to the Instagram and LinkedIn
+  ones; each post then picks **which** of them it sends, **in what order**.
 - **Publish** — send an approved post to the Facebook Page, Instagram Business
-  account or LinkedIn Company Page it was written for, from inside the app.
+  account or LinkedIn Company Page it was written for, from inside the app,
+  with one image or several (multi-photo, carousel, multi-image). The dialog
+  shows the post rendered in that network's own chrome before it goes.
   Accounts are connected once via OAuth; tokens are encrypted at rest.
 - **Catalog** — a polite scraper crawls the WRCC site (aXcelerate-rendered
   courses + scheduled offerings) and stages a diff; **nothing touches the live
@@ -27,7 +33,7 @@ Social content generation + course catalog studio for
 | LLM | `google-genai` (Gemini) or `openai` (GPT) behind an `LLMClient` protocol with a deterministic mock (`LLM_MOCK=true` by default; provider via `LLM_PROVIDER`) |
 | Scraper | httpx (politeness delay + bounded retries) + BeautifulSoup |
 | Frontend | Next.js 14, React 18, TypeScript, CSS modules |
-| Tests | pytest + pytest-asyncio (416 tests, HTML fixtures, `httpx.MockTransport` for wire contracts); vitest (66) + Playwright |
+| Tests | pytest + pytest-asyncio (500 tests, HTML fixtures, `httpx.MockTransport` for wire contracts); vitest (160) + Playwright |
 
 ## Getting started
 
@@ -94,6 +100,8 @@ backend/app/
 │                validation (deterministic ranking baseline)
 ├── llm/         LLMClient protocol · MockLLMClient · GeminiLLMClient · OpenAILLMClient
 ├── content/     schemas · state machine · repository · services (generate + workflow)
+│                ├ ingest.py  pure: decode → strip metadata → resize → re-encode
+│                └ media.py   library (per generation) + selection (per post)
 ├── publishing/  crypto (Fernet) · media (JPEG + signed URLs) · rules (preflight)
 │                · service (the one irreversible path) · accounts
 │                ├ oauth/       meta · linkedin · mock, behind get_oauth_provider
@@ -133,14 +141,22 @@ account under **Settings → Connections**, then hit **Publish** on the card. Se
 [`docs/PUBLISH-PLAN.md`](docs/PUBLISH-PLAN.md) for the full design and
 decisions D5–D8.
 
-- **Facebook** — Page feed, with or without a photo. Image bytes are uploaded
-  directly, so Facebook publishing does not need a public host.
+- **Facebook** — Page feed, with no photo, one photo, or several. Several means
+  each photo is uploaded `published=false` and one `/feed` call binds them with
+  `attached_media`. Image bytes are uploaded directly, so Facebook publishing
+  does not need a public host.
 - **Instagram** — the container → poll → publish two-step. Always needs an
   image, and the image must be reachable by Meta, which is what the signed
-  public URL below is for.
+  public URL below is for. Two or more images add a layer: a child container
+  per image, then a `CAROUSEL` parent that carries the caption.
 - **LinkedIn** — Company Page via the versioned REST API (three-leg image
-  upload); posting as a member is the fallback if the Community Management API
-  is not approved.
+  upload, repeated per image, with `content.multiImage` for several); posting
+  as a member is the fallback if the Community Management API is not approved.
+
+Whatever the image count, the retry boundary sits in the same place: the
+scaffolding (unpublished photos, carousel containers, uploaded LinkedIn assets)
+is private and freely retried, and the single call that creates the post runs
+exactly once.
 
 Publish is the only action in this app whose effect is on someone else's
 server, so it is guarded at four levels rather than one: only `approved` items
@@ -184,8 +200,27 @@ every failure answers **404 rather than 403** so it cannot be used to test
 whether an id exists. `MEDIA_SIGNING_SECRET` must differ from `AUTH_SECRET` —
 enforced at startup — so a leaked image key cannot forge a session.
 
+## Uploaded images
+
+Nothing an operator uploads is stored as it arrived. Every accepted file is
+decoded to raw pixels and re-encoded, which settles three problems at once and
+is why the cost is worth paying:
+
+- **Privacy** — a phone photo carries the GPS coordinates of wherever it was
+  taken, and these bytes are served from the unauthenticated endpoint above.
+  Re-encoding from pixel data leaves no metadata to leak.
+- **Size** — assets live in a `LargeBinary` column. A 24 MP upload is ~8 MB;
+  the same picture at 2048px is ~400 KB and larger than any network renders.
+- **Trust** — the declared content type and the filename extension are claims
+  made by the caller. Format is decided by decoding the header, and a file that
+  is both a valid image and something else cannot survive being re-encoded.
+
+Identical bytes re-uploaded into the same generation attach the existing asset
+rather than storing a second copy. See [`docs/MEDIA-PLAN.md`](docs/MEDIA-PLAN.md)
+for the full design and decisions D9–D14.
+
 ## Deliberately out of scope
 
 Scheduling, analytics, campaigns, editable brand-voice profiles, user
-management beyond the seeded login. See `docs/PLAN.md` for the full plan and
-decisions D1–D4.
+management beyond the seeded login, video/stories/reels, in-app image editing.
+See `docs/PLAN.md` for the full plan and decisions D1–D4.

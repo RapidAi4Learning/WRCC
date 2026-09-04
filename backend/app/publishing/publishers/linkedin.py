@@ -2,13 +2,23 @@
 
 An image post is three legs: initialize an upload, PUT the bytes to the URL
 LinkedIn hands back, then create the post referencing the returned image URN.
+Several images repeat the first two legs per image and change the third:
+``content.media`` becomes ``content.multiImage.images``. LinkedIn models the two
+as different shapes rather than as a list of length one, so the single-image
+request stays exactly what it was.
 
 The post id does **not** come back in the response body — it arrives in the
 ``x-restli-id`` header, which is easy to miss and leaves you with a successful
 post you cannot link to.
+
+``multiImage`` rides the same Community Management API approval the
+single-image path already needs, and the payload shape is versioned — confirm
+both against ``LINKEDIN_API_VERSION`` before going live.
 """
 
 from __future__ import annotations
+
+from functools import partial
 
 import httpx
 
@@ -66,21 +76,57 @@ class LinkedInPublisher:
         token = request.account.access_token
         author = self._author(request)
 
-        # Only the upload is retried. An uploaded image is not a post — a second
-        # copy is invisible to everyone. Creating the post is not repeatable, so
-        # it happens once, below, outside the retry.
-        image_urn: str | None = None
-        image_bytes = request.image_bytes
-        if image_bytes:
-            image_urn = await with_retries(
-                lambda: self._upload_image(image_bytes, owner=author, token=token),
-                attempts=self._settings.publish_max_attempts,
-                base_delay=self._settings.publish_retry_base_delay_seconds,
-                description="LinkedIn image upload",
+        # Only the uploads are retried. An uploaded image is not a post — a
+        # second copy is invisible to everyone. Creating the post is not
+        # repeatable, so it happens once, below, outside the retry. Each image
+        # is retried on its own rather than the batch: re-uploading four
+        # because the fifth was throttled is waste, not safety.
+        image_urns: list[str] = []
+        for index, image in enumerate(request.images):
+            image_urns.append(
+                await with_retries(
+                    partial(
+                        self._upload_image,
+                        image.data,
+                        owner=author,
+                        token=token,
+                    ),
+                    attempts=self._settings.publish_max_attempts,
+                    base_delay=self._settings.publish_retry_base_delay_seconds,
+                    description=f"LinkedIn image {index + 1} upload",
+                )
             )
         return await self._create_post(
-            request, author=author, token=token, image_urn=image_urn
+            request, author=author, token=token, image_urns=image_urns
         )
+
+    def _content_for(
+        self, request: PublishRequest, image_urns: list[str]
+    ) -> dict | None:
+        """The post's `content` block: absent, single `media`, or `multiImage`.
+
+        LinkedIn treats one image and several as different shapes rather than a
+        list of length one, so the single-image path stays byte-identical to
+        what it was before carousels existed.
+        """
+        if not image_urns:
+            return None
+        if len(image_urns) == 1:
+            media: dict = {"id": image_urns[0]}
+            alt = request.images[0].alt
+            if alt:
+                media["altText"] = alt
+            return {"media": media}
+
+        images = []
+        # strict: one URN was collected per image, in order, a few lines up —
+        # a length mismatch here would mean an image silently lost its upload.
+        for urn, image in zip(image_urns, request.images, strict=True):
+            entry: dict = {"id": urn}
+            if image.alt:
+                entry["altText"] = image.alt
+            images.append(entry)
+        return {"multiImage": {"images": images}}
 
     async def _create_post(
         self,
@@ -88,7 +134,7 @@ class LinkedInPublisher:
         *,
         author: str,
         token: str,
-        image_urn: str | None,
+        image_urns: list[str],
     ) -> PublishResult:
         body: dict = {
             "author": author,
@@ -102,11 +148,9 @@ class LinkedInPublisher:
             "lifecycleState": "PUBLISHED",
             "isReshareDisabledByAuthor": False,
         }
-        if image_urn:
-            media: dict = {"id": image_urn}
-            if request.image_alt:
-                media["altText"] = request.image_alt
-            body["content"] = {"media": media}
+        content = self._content_for(request, image_urns)
+        if content is not None:
+            body["content"] = content
 
         async with self._client() as client:
             response = await client.post(

@@ -30,7 +30,7 @@ def _ready_context(platform: ContentPlatform, **overrides) -> PreflightContext:
         "status": ContentStatus.approved,
         "text": "A perfectly reasonable post.",
         "hashtag_count": 2,
-        "has_image": True,
+        "image_count": 1,
         "account_connected": True,
     }
     defaults.update(overrides)
@@ -158,7 +158,7 @@ def test_stale_attempt_tells_the_operator_to_check_the_network() -> None:
 
 
 def test_instagram_requires_an_image() -> None:
-    outcome = preflight(_ready_context(ContentPlatform.instagram, has_image=False))
+    outcome = preflight(_ready_context(ContentPlatform.instagram, image_count=0))
     assert not outcome.ready
     assert any("require an image" in blocker for blocker in outcome.blockers)
 
@@ -167,7 +167,7 @@ def test_instagram_requires_an_image() -> None:
     "platform", [ContentPlatform.facebook, ContentPlatform.linkedin]
 )
 def test_image_is_optional_off_instagram(platform: ContentPlatform) -> None:
-    assert preflight(_ready_context(platform, has_image=False)).ready
+    assert preflight(_ready_context(platform, image_count=0)).ready
 
 
 # ── text length ──
@@ -227,7 +227,7 @@ def test_every_blocker_is_reported_not_just_the_first() -> None:
             status=ContentStatus.draft,
             text="",
             hashtag_count=99,
-            has_image=False,
+            image_count=0,
             account_connected=False,
         )
     )

@@ -3,13 +3,15 @@
 
 import type { AuthUser, LoginCredentials } from "@/types/auth";
 import type {
-  ContentImage,
   ContentItem,
   ContentStatus,
   GenerateContentInput,
   GenerateContentResult,
   ImageSuggestions,
+  MediaAsset,
+  MediaLibrary,
   Platform,
+  SetSelectionResult,
   WorkflowAction,
 } from "@/types/content";
 import type {
@@ -126,7 +128,7 @@ export function editContent(itemId: string, body: string): Promise<ContentItem> 
   });
 }
 
-// ── Post images ──
+// ── Post media ──
 
 export function fetchImageSuggestions(itemId: string): Promise<ImageSuggestions> {
   return request<ImageSuggestions>(`/api/content/${itemId}/images/suggestions`, {
@@ -137,18 +139,80 @@ export function fetchImageSuggestions(itemId: string): Promise<ImageSuggestions>
 export function generateImage(
   itemId: string,
   prompt: string,
-): Promise<ContentImage> {
-  return request<ContentImage>(`/api/content/${itemId}/images`, {
+): Promise<MediaAsset> {
+  return request<MediaAsset>(`/api/content/${itemId}/images`, {
     method: "POST",
     body: JSON.stringify({ prompt }),
   });
 }
 
-export function fetchImages(itemId: string): Promise<ContentImage[]> {
-  return request<ContentImage[]>(`/api/content/${itemId}/images`);
+export function fetchImages(itemId: string): Promise<MediaAsset[]> {
+  return request<MediaAsset[]>(`/api/content/${itemId}/images`);
 }
 
-export function imageFileUrl(image: ContentImage, download = false): string {
+export function fetchMedia(itemId: string): Promise<MediaLibrary> {
+  return request<MediaLibrary>(`/api/content/${itemId}/media`);
+}
+
+// Multipart, so this deliberately bypasses `request`: setting a JSON
+// Content-Type here would strip the boundary the server needs to parse the
+// body, and the failure would look like a malformed upload rather than a
+// header mistake.
+export async function uploadMedia(
+  itemId: string,
+  files: File[],
+): Promise<MediaAsset[]> {
+  const form = new FormData();
+  for (const file of files) form.append("files", file);
+
+  const response = await fetch(`${API_BASE}/api/content/${itemId}/media`, {
+    method: "POST",
+    credentials: "include",
+    body: form,
+  });
+  if (!response.ok) {
+    let detail = `Upload failed (${response.status})`;
+    try {
+      const body = await response.json();
+      if (typeof body?.detail === "string") detail = body.detail;
+    } catch {
+      // Non-JSON error body — keep the generic message.
+    }
+    throw new ApiError(response.status, detail);
+  }
+  return response.json();
+}
+
+export function saveMediaSelection(
+  itemId: string,
+  assetIds: string[],
+  applyToGroup = false,
+): Promise<SetSelectionResult> {
+  return request<SetSelectionResult>(`/api/content/${itemId}/media/selection`, {
+    method: "PUT",
+    body: JSON.stringify({ asset_ids: assetIds, apply_to_group: applyToGroup }),
+  });
+}
+
+export async function deleteMediaAsset(assetId: string): Promise<void> {
+  // 204 No Content — there is no body to parse, so this bypasses `request`.
+  const response = await fetch(`${API_BASE}/api/content/media/${assetId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    let detail = "Could not delete the image.";
+    try {
+      const body = await response.json();
+      if (typeof body?.detail === "string") detail = body.detail;
+    } catch {
+      // Non-JSON error body — keep the generic message.
+    }
+    throw new ApiError(response.status, detail);
+  }
+}
+
+export function imageFileUrl(image: MediaAsset, download = false): string {
   return `${API_BASE}${image.file_url}${download ? "?download=true" : ""}`;
 }
 
@@ -194,11 +258,16 @@ export async function disconnectSocialAccount(accountId: string): Promise<void> 
 
 // ── Publishing ──
 
+// `assetIds` undefined means "whatever the post has saved"; an empty array
+// means "send no images", which is a different instruction.
 export function fetchPublishPreflight(
   itemId: string,
-  imageId?: string,
+  assetIds?: string[],
 ): Promise<PublishPreflight> {
-  const query = imageId ? `?image_id=${encodeURIComponent(imageId)}` : "";
+  const query =
+    assetIds === undefined
+      ? ""
+      : `?asset_ids=${encodeURIComponent(assetIds.join(","))}`;
   return request<PublishPreflight>(
     `/api/content/${itemId}/publish/preflight${query}`,
   );
@@ -206,11 +275,11 @@ export function fetchPublishPreflight(
 
 export function publishContent(
   itemId: string,
-  imageId?: string,
+  assetIds?: string[],
 ): Promise<Publication> {
   return request<Publication>(`/api/content/${itemId}/publish`, {
     method: "POST",
-    body: JSON.stringify({ image_id: imageId ?? null }),
+    body: JSON.stringify({ asset_ids: assetIds ?? null }),
   });
 }
 

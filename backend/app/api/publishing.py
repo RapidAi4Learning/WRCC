@@ -13,7 +13,7 @@ import logging
 import urllib.parse
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -86,16 +86,16 @@ def _account_out(account: SocialAccount) -> SocialAccountOut:
     )
 
 
-def _publication_out(publication: ContentPublication) -> PublicationOut:
+def _publication_out(
+    publication: ContentPublication, media_ids: list[str] | None = None
+) -> PublicationOut:
     return PublicationOut(
         id=str(publication.id),
         content_item_id=str(publication.content_item_id),
         social_account_id=(
             str(publication.social_account_id) if publication.social_account_id else None
         ),
-        content_image_id=(
-            str(publication.content_image_id) if publication.content_image_id else None
-        ),
+        media_asset_ids=media_ids or [],
         status=publication.status.value,
         external_post_id=publication.external_post_id,
         permalink=publication.permalink,
@@ -295,15 +295,34 @@ async def disconnect_social_account(
 # ── publishing ──
 
 
+def _parse_asset_ids(raw: str | None) -> list[uuid.UUID] | None:
+    """Comma-separated ids, preserving the empty-vs-absent distinction."""
+    if raw is None:
+        return None
+    trimmed = [part.strip() for part in raw.split(",") if part.strip()]
+    try:
+        return [uuid.UUID(part) for part in trimmed]
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="asset_ids must be a comma-separated list of image ids.",
+        ) from exc
+
+
 @router.get("/api/content/{item_id}/publish/preflight", response_model=PreflightOut)
 async def publish_preflight(
     item_id: uuid.UUID,
-    image_id: uuid.UUID | None = None,
+    # Comma-separated, so the dialog can preview a reordered selection without
+    # saving it first. One parameter rather than a repeated one because the
+    # three states must stay distinguishable: omitted means "use what the post
+    # has saved", and an empty string means "send no images" — which is a real
+    # choice, and the one a repeated parameter cannot express.
+    asset_ids: str | None = Query(default=None),
     service: PublishService = Depends(get_publish_service),
 ) -> PreflightOut:
     try:
-        item, account, image, text, outcome = await service.preflight(
-            item_id, image_id=image_id
+        item, account, images, text, outcome = await service.preflight(
+            item_id, asset_ids=_parse_asset_ids(asset_ids)
         )
     except ContentItemNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -319,8 +338,9 @@ async def publish_preflight(
         char_count=len(text),
         char_limit=limits.text_limit,
         hashtag_count=len(item.hashtags or []),
-        image_id=str(image.id) if image is not None else None,
+        image_ids=[str(image.id) for image in images],
         image_required=limits.image_required,
+        max_images=limits.max_images,
         account=_account_out(account) if account is not None else None,
     )
 
@@ -334,7 +354,7 @@ async def publish_content(
 ) -> PublicationOut:
     try:
         publication = await service.publish(
-            item_id, actor_id=user.id, image_id=body.image_id if body else None
+            item_id, actor_id=user.id, asset_ids=body.asset_ids if body else None
         )
     except ContentItemNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -356,7 +376,8 @@ async def publish_content(
             status_code=422,
             detail=" ".join(exc.blockers),
         ) from exc
-    return _publication_out(publication)
+    media = await service.published_media_ids([publication.id])
+    return _publication_out(publication, media.get(publication.id))
 
 
 @router.get("/api/content/{item_id}/publications", response_model=list[PublicationOut])
@@ -368,4 +389,8 @@ async def list_publications(
         publications = await service.list_publications(item_id)
     except ContentItemNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    return [_publication_out(publication) for publication in publications]
+    media = await service.published_media_ids([p.id for p in publications])
+    return [
+        _publication_out(publication, media.get(publication.id))
+        for publication in publications
+    ]

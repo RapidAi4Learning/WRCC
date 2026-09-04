@@ -14,6 +14,7 @@ import pytest
 from app.db.enums import ContentPlatform
 from app.publishing.publishers.base import (
     PublishError,
+    PublishImage,
     PublishRequest,
     ResolvedAccount,
 )
@@ -49,10 +50,25 @@ def _request(
     text: str = "Enrol in First Aid.",
     image_url: str | None = None,
     image_bytes: bytes | None = None,
+    images: tuple[PublishImage, ...] | None = None,
     link: str | None = None,
     metadata: dict | None = None,
     external_id: str = "page-1",
 ) -> PublishRequest:
+    """Build a request. `image_url`/`image_bytes` build the single-image case;
+    `images` is for the multi-image ones."""
+    if images is None:
+        images = (
+            (
+                PublishImage(
+                    data=image_bytes or b"",
+                    url=image_url,
+                    alt="a bright classroom",
+                ),
+            )
+            if (image_url or image_bytes)
+            else ()
+        )
     return PublishRequest(
         text=text,
         account=ResolvedAccount(
@@ -63,10 +79,20 @@ def _request(
             access_token="PAGE-TOKEN",
             metadata=metadata or {},
         ),
-        image_url=image_url,
-        image_bytes=image_bytes,
-        image_alt="a bright classroom",
+        images=images,
         link=link,
+    )
+
+
+def _images(count: int, *, with_url: bool = False) -> tuple[PublishImage, ...]:
+    """`count` distinguishable images, so a test can assert on their order."""
+    return tuple(
+        PublishImage(
+            data=JPEG + bytes([index]),
+            url=f"https://api.test/img-{index + 1}.jpg" if with_url else None,
+            alt=f"image {index + 1}",
+        )
+        for index in range(count)
     )
 
 

@@ -393,3 +393,32 @@
   color: var(--color-warn);
   background: var(--color-warn-soft);
 }
+
+/* Order badge on a selected thumbnail: position in the carousel, not a count. */
+.thumb,
+.thumbActive {
+  position: relative;
+}
+
+.thumbOrder {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.imageCount {
+  font-weight: 400;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}

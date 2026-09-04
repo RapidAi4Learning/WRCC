@@ -15,8 +15,12 @@ dependencies = [
     "pyjwt>=2.10",
     # Fernet, for the OAuth tokens stored in social_accounts.
     "cryptography>=44",
-    # PNG → JPEG for publishing: Instagram rejects PNG outright.
+    # PNG → JPEG for publishing (Instagram rejects PNG outright), and the
+    # decode/strip/re-encode pass every upload goes through.
     "pillow>=11",
+    # Multipart parsing for the media upload endpoint. FastAPI needs it present
+    # at import time, not just at request time.
+    "python-multipart>=0.0.20",
     "httpx>=0.27",
     "beautifulsoup4>=4.12",
     "google-genai>=1.0",
@@ -31,6 +35,9 @@ dev = [
     "aiosqlite>=0.20",
     "ruff>=0.8",
     "mypy>=1.13",
+    # Writes the EXIF (including GPS) that the ingest test then asserts is gone.
+    # Test-only: nothing in `app/` reads or writes metadata, it only strips it.
+    "piexif>=1.1.3",
 ]
 
 [build-system]

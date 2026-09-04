@@ -30,7 +30,14 @@ from app.content.repository import ContentRepository
 from app.content.service import ContentItemNotFoundError
 from app.content.state import assert_transition
 from app.db.enums import ContentPlatform, ContentStatus, PublishStatus
-from app.db.models import ContentImage, ContentItem, ContentPublication, SocialAccount
+from app.db.models import (
+    ContentItem,
+    ContentItemMedia,
+    ContentPublication,
+    ContentPublicationMedia,
+    MediaAsset,
+    SocialAccount,
+)
 from app.publishing.accounts import SocialAccountService, is_token_expired
 from app.publishing.media import (
     MediaConversionError,
@@ -41,7 +48,7 @@ from app.publishing.media import (
 )
 from app.publishing.meta_graph import redact_access_token
 from app.publishing.publishers import Publisher, PublishError, get_publisher
-from app.publishing.publishers.base import PublishRequest
+from app.publishing.publishers.base import PublishImage, PublishRequest
 from app.publishing.rules import (
     PreflightContext,
     PreflightOutcome,
@@ -132,23 +139,95 @@ class PublishService:
         )
         return list(result.scalars())
 
-    async def _resolve_image(
-        self, item: ContentItem, image_id: uuid.UUID | None
-    ) -> ContentImage | None:
-        """Explicit image if given (and it belongs to this post), else the latest."""
-        if image_id is not None:
-            image = await self._session.get(ContentImage, image_id)
-            if image is None or image.content_item_id != item.id:
-                raise ImageNotFoundError(
-                    f"Image {image_id} does not belong to content item {item.id}."
-                )
-            return image
+    async def published_media_ids(
+        self, publication_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, list[str]]:
+        """Which assets each attempt sent, in order. One query for the batch."""
+        if not publication_ids:
+            return {}
         result = await self._session.execute(
-            select(ContentImage)
-            .where(ContentImage.content_item_id == item.id)
-            .order_by(ContentImage.created_at.desc(), ContentImage.id.desc())
+            select(ContentPublicationMedia)
+            .where(ContentPublicationMedia.publication_id.in_(publication_ids))
+            .order_by(
+                ContentPublicationMedia.publication_id,
+                ContentPublicationMedia.position,
+            )
         )
-        return result.scalars().first()
+        grouped: dict[uuid.UUID, list[str]] = {}
+        for row in result.scalars():
+            if row.media_asset_id is None:
+                continue
+            grouped.setdefault(row.publication_id, []).append(str(row.media_asset_id))
+        return grouped
+
+    async def _available_ids(self, item: ContentItem) -> set[uuid.UUID]:
+        """Every asset this item is allowed to publish — its generation group."""
+        if item.generation_group is None:
+            result = await self._session.execute(
+                select(ContentItemMedia.media_asset_id).where(
+                    ContentItemMedia.content_item_id == item.id
+                )
+            )
+            return set(result.scalars())
+        result = await self._session.execute(
+            select(MediaAsset.id).where(
+                MediaAsset.generation_group == item.generation_group
+            )
+        )
+        return set(result.scalars())
+
+    async def _resolve_media(
+        self, item: ContentItem, asset_ids: list[uuid.UUID] | None
+    ) -> list[MediaAsset]:
+        """The images this post will send, in publish order.
+
+        An explicit list from the request wins (the publish dialog lets the
+        operator reorder without saving first); otherwise the item's stored
+        selection. Order is preserved exactly as given — on a carousel it is
+        what the reader scrolls through.
+        """
+        if asset_ids is not None:
+            if not asset_ids:
+                return []
+            available = await self._available_ids(item)
+            unknown = [str(a) for a in asset_ids if a not in available]
+            if unknown:
+                raise ImageNotFoundError(
+                    f"Image(s) {', '.join(unknown)} are not available to content "
+                    f"item {item.id}."
+                )
+            result = await self._session.execute(
+                select(MediaAsset).where(MediaAsset.id.in_(asset_ids))
+            )
+            by_id = {asset.id: asset for asset in result.scalars()}
+            return [by_id[a] for a in asset_ids if a in by_id]
+
+        rows = await self._session.execute(
+            select(ContentItemMedia)
+            .where(ContentItemMedia.content_item_id == item.id)
+            .order_by(ContentItemMedia.position)
+        )
+        selection = list(rows.scalars())
+        if not selection:
+            return []
+        result = await self._session.execute(
+            select(MediaAsset).where(
+                MediaAsset.id.in_([row.media_asset_id for row in selection])
+            )
+        )
+        by_id = {asset.id: asset for asset in result.scalars()}
+        return [
+            by_id[row.media_asset_id]
+            for row in selection
+            if row.media_asset_id in by_id
+        ]
+
+    async def _unselected_count(
+        self, item: ContentItem, selected: list[MediaAsset]
+    ) -> int:
+        """Assets in the library this post is leaving behind."""
+        available = await self._available_ids(item)
+        return max(0, len(available - {asset.id for asset in selected}))
 
     def _is_stale(self, attempt: ContentPublication, now: dt.datetime) -> bool:
         created = attempt.created_at
@@ -159,19 +238,39 @@ class PublishService:
 
     # ── preflight ──
 
+    def _image_problems(
+        self, item: ContentItem, images: list[MediaAsset]
+    ) -> list[str]:
+        """Per-image spec violations, each carrying its own position.
+
+        Only Instagram enforces a shape, and on a carousel it enforces it on
+        every child — an eighth image outside the accepted ratio fails the post
+        as surely as the first would, so an anonymous list of problems would
+        leave the operator hunting for which picture to replace.
+        """
+        if item.platform is not ContentPlatform.instagram:
+            return []
+        problems: list[str] = []
+        for index, image in enumerate(images):
+            prefix = f"Image {index + 1}: " if len(images) > 1 else ""
+            problems.extend(
+                f"{prefix}{problem}" for problem in instagram_problems(image.data)
+            )
+        return problems
+
     async def preflight(
-        self, item_id: uuid.UUID, *, image_id: uuid.UUID | None = None
+        self, item_id: uuid.UUID, *, asset_ids: list[uuid.UUID] | None = None
     ) -> tuple[
         ContentItem,
         SocialAccount | None,
-        ContentImage | None,
+        list[MediaAsset],
         str,
         PreflightOutcome,
     ]:
         """Evaluate every rule without sending anything. Safe to call freely."""
         item = await self._get_item(item_id)
         account = await self._accounts.get_active(item.platform)
-        image = await self._resolve_image(item, image_id)
+        images = await self._resolve_media(item, asset_ids)
         text = compose_post_text(
             item.edited_body or item.generated_body,
             item.call_to_action,
@@ -185,12 +284,9 @@ class PublishService:
                 status=item.status,
                 text=text,
                 hashtag_count=len(item.hashtags or []),
-                has_image=image is not None,
-                image_problems=(
-                    instagram_problems(image.data)
-                    if image is not None and item.platform is ContentPlatform.instagram
-                    else []
-                ),
+                image_count=len(images),
+                image_problems=self._image_problems(item, images),
+                unselected_available=await self._unselected_count(item, images),
                 account_connected=account is not None,
                 account_token_expired=(
                     account is not None and is_token_expired(account, now=now)
@@ -202,7 +298,7 @@ class PublishService:
                 ),
             )
         )
-        return item, account, image, text, outcome
+        return item, account, images, text, outcome
 
     # ── publish ──
 
@@ -211,7 +307,7 @@ class PublishService:
         item_id: uuid.UUID,
         *,
         actor_id: uuid.UUID,
-        image_id: uuid.UUID | None = None,
+        asset_ids: list[uuid.UUID] | None = None,
     ) -> ContentPublication:
         """Send the post and return the attempt record.
 
@@ -220,8 +316,8 @@ class PublishService:
         (unknown item, already published, preflight blockers) raise instead,
         because nothing was attempted and nothing was recorded.
         """
-        item, account, image, text, outcome = await self.preflight(
-            item_id, image_id=image_id
+        item, account, images, text, outcome = await self.preflight(
+            item_id, asset_ids=asset_ids
         )
 
         existing = await self._succeeded_publication(item.id)
@@ -232,27 +328,49 @@ class PublishService:
         assert account is not None  # preflight blocks when it is None
 
         resolved = self._accounts.resolve(account)
-        image_url = self._image_url(image)
-        # Converted before any attempt is recorded: an unreadable image is a
+        # Every URL is signed here, from one clock, so the last child of a
+        # ten-image carousel is still valid when Meta gets to it. Bytes are
+        # converted before any attempt is recorded: an unreadable image is a
         # refusal, not a failed publish.
-        image_jpeg = self._image_jpeg(image)
+        publish_images = tuple(
+            PublishImage(
+                data=self._image_jpeg(image),
+                url=self._image_url(image),
+                alt=(image.alt_text or image.prompt or image.filename or None),
+            )
+            for image in images
+        )
         publisher = self._publisher or get_publisher(item.platform, self._settings)
 
         attempt = ContentPublication(
+            # Assigned here rather than at flush: the media rows below reference
+            # it, and the flush that would generate it must not happen outside
+            # the try that catches the in-flight unique violation.
+            id=uuid.uuid4(),
             content_item_id=item.id,
             social_account_id=account.id,
-            content_image_id=image.id if image is not None else None,
             status=PublishStatus.pending,
             request_summary={
                 "platform": item.platform.value,
                 "destination": account.display_name,
                 "chars": len(text),
                 "hashtags": len(item.hashtags or []),
-                "has_image": image is not None,
+                "image_count": len(images),
             },
             attempted_by=actor_id,
         )
         self._session.add(attempt)
+        # Recorded alongside the pending row and inside the same pre-call
+        # commit: if the attempt dies mid-flight, "what did we send?" must be
+        # answerable from the database alone.
+        self._session.add_all(
+            ContentPublicationMedia(
+                publication_id=attempt.id,
+                media_asset_id=image.id,
+                position=position,
+            )
+            for position, image in enumerate(images)
+        )
         # Committed before the call on purpose — see the module docstring.
         try:
             await self._session.commit()
@@ -272,9 +390,7 @@ class PublishService:
         request = PublishRequest(
             text=text,
             account=resolved,
-            image_url=image_url,
-            image_bytes=image_jpeg,
-            image_alt=image.prompt[:300] if image is not None else None,
+            images=publish_images,
             link=item.reference_url,
         )
 
@@ -321,29 +437,25 @@ class PublishService:
         await self._session.commit()
         return attempt
 
-    def _image_jpeg(self, image: ContentImage | None) -> bytes | None:
-        """Convert the stored PNG once, for the networks that upload bytes.
+    def _image_jpeg(self, image: MediaAsset) -> bytes:
+        """Convert the stored bytes once, for the networks that upload them.
 
         Doing it here rather than per-publisher means Facebook and LinkedIn
         receive exactly what the signed URL would hand Instagram, so the three
         posts cannot end up showing different renderings of the same image.
         """
-        if image is None:
-            return None
         try:
             return to_jpeg(image.data)
         except MediaConversionError as exc:
             raise PublishNotAllowedError([str(exc)]) from exc
 
-    def _image_url(self, image: ContentImage | None) -> str | None:
+    def _image_url(self, image: MediaAsset) -> str | None:
         """Signed public URL for the networks that fetch the image themselves.
 
         A missing public host is not fatal here: LinkedIn uploads raw bytes and
         Facebook can post text-only, so the publisher decides whether the
         absence is a problem for its platform.
         """
-        if image is None:
-            return None
         try:
             return sign_image_url(self._settings, image_id=image.id)
         except MediaSigningError as exc:

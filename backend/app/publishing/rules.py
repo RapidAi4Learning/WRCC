@@ -25,6 +25,13 @@ class PlatformLimits:
     image_required: bool
     # Above this many hashtags we warn; above `hashtag_limit` we block.
     hashtag_warn_above: int
+    # How many images the network will take on one post.
+    max_images: int
+    # At or above this count the post becomes a multi-image shape (an Instagram
+    # carousel, a Facebook `attached_media` story, a LinkedIn multiImage post)
+    # rather than the single-image one. Below it, the existing single-image
+    # path is used unchanged.
+    multi_image_from: int = 2
 
 
 # Facebook and LinkedIn publish no hashtag ceiling of their own, so 100 is ours:
@@ -32,13 +39,26 @@ class PlatformLimits:
 # that has clearly gone wrong. Instagram's 30 is a real, enforced API limit.
 LIMITS: dict[ContentPlatform, PlatformLimits] = {
     ContentPlatform.facebook: PlatformLimits(
-        text_limit=63_206, hashtag_limit=100, image_required=False, hashtag_warn_above=10
+        text_limit=63_206,
+        hashtag_limit=100,
+        image_required=False,
+        hashtag_warn_above=10,
+        max_images=10,
     ),
     ContentPlatform.instagram: PlatformLimits(
-        text_limit=2_200, hashtag_limit=30, image_required=True, hashtag_warn_above=15
+        text_limit=2_200,
+        hashtag_limit=30,
+        image_required=True,
+        hashtag_warn_above=15,
+        # A carousel takes 10; the API rejects an eleventh outright.
+        max_images=10,
     ),
     ContentPlatform.linkedin: PlatformLimits(
-        text_limit=3_000, hashtag_limit=100, image_required=False, hashtag_warn_above=5
+        text_limit=3_000,
+        hashtag_limit=100,
+        image_required=False,
+        hashtag_warn_above=5,
+        max_images=20,
     ),
 }
 
@@ -49,11 +69,17 @@ class PreflightContext:
     status: ContentStatus
     text: str
     hashtag_count: int = 0
-    has_image: bool = False
+    # How many images the operator selected, in publish order.
+    image_count: int = 0
     # Spec violations the media layer could not fix for us (aspect ratio, an
     # image too small to post). Reported verbatim — they are already phrased
-    # for the operator.
+    # for the operator, and carry their own image's position when there is more
+    # than one.
     image_problems: list[str] = field(default_factory=list)
+    # Assets sitting in the library that this post is not sending. Drives a
+    # warning, never a blocker — "you generated four and ticked one" is worth
+    # mentioning and never worth refusing.
+    unselected_available: int = 0
     account_connected: bool = False
     account_token_expired: bool = False
     already_published: bool = False
@@ -119,13 +145,37 @@ def preflight(context: PreflightContext) -> PreflightOutcome:
             "Reconnect it in Settings."
         )
 
-    if limits.image_required and not context.has_image:
+    if limits.image_required and context.image_count == 0:
         blockers.append(
             f"{context.platform.value.title()} posts require an image. "
-            "Generate one first."
+            "Generate or upload one first."
         )
     elif limits.image_required:
         blockers.extend(context.image_problems)
+
+    if context.image_count > limits.max_images:
+        blockers.append(
+            f"{context.image_count} images selected; "
+            f"{context.platform.value} accepts {limits.max_images}."
+        )
+
+    if (
+        context.platform is ContentPlatform.instagram
+        and context.image_count >= limits.multi_image_from
+    ):
+        # The single most common surprise in an Instagram carousel, and one no
+        # API error will ever tell the operator about.
+        warnings.append(
+            "Instagram crops every image in a carousel to the aspect ratio of "
+            "the first one."
+        )
+
+    if context.image_count == 1 and context.unselected_available > 0:
+        warnings.append(
+            f"{context.unselected_available} more "
+            f"image{'s' if context.unselected_available > 1 else ''} in the "
+            "library are not part of this post."
+        )
 
     text_length = len(context.text)
     if text_length == 0:

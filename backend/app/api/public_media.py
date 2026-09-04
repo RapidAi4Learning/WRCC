@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.db.base import get_session
-from app.db.models import ContentImage
+from app.db.models import MediaAsset
 from app.publishing.media import MediaConversionError, to_jpeg, verify_image_signature
 
 router = APIRouter(tags=["public-media"])
@@ -46,7 +46,7 @@ async def public_image(
     ):
         raise _NOT_FOUND
 
-    image = await session.get(ContentImage, image_id)
+    image = await session.get(MediaAsset, image_id)
     if image is None:
         raise _NOT_FOUND
 

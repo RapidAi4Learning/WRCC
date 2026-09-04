@@ -16,14 +16,15 @@ import Link from "next/link";
 
 import {
   ApiError,
-  fetchImages,
+  fetchMedia,
   fetchPublishPreflight,
   imageFileUrl,
   publishContent,
 } from "@/lib/api";
-import type { ContentImage, ContentItem } from "@/types/content";
+import type { MediaAsset, ContentItem } from "@/types/content";
 import type { Publication, PublishPreflight } from "@/types/publishing";
 import { PLATFORM_LABELS } from "@/components/Badges";
+import PostPreview from "@/components/PostPreview";
 import { publishingHold } from "@/lib/publishing";
 import styles from "./PublishDialog.module.css";
 
@@ -45,11 +46,12 @@ export default function PublishDialog({
   onPublished,
 }: PublishDialogProps) {
   const [preflight, setPreflight] = useState<PublishPreflight | null>(null);
-  const [images, setImages] = useState<ContentImage[] | null>(null);
-  // `null` means "whatever the server picks" (the most recent image). The
-  // server's choice comes back in the preflight, so selection is derived rather
-  // than copied — copying it back into state would cost a second round trip.
-  const [chosenImageId, setChosenImageId] = useState<string | null>(null);
+  const [library, setLibrary] = useState<MediaAsset[] | null>(null);
+  // `null` means "whatever the post has saved". The saved selection comes back
+  // in the preflight, so it is derived rather than copied — copying it into
+  // state would cost a second round trip and give it a chance to disagree.
+  // A non-null empty array is a real instruction: send no images.
+  const [override, setOverride] = useState<string[] | null>(null);
   const [isChecking, setIsChecking] = useState(true);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isArmed, setIsArmed] = useState(false);
@@ -63,10 +65,10 @@ export default function PublishDialog({
   const hold = publishingHold(item.platform);
 
   const runPreflight = useCallback(
-    async (imageId: string | null) => {
+    async (assetIds: string[] | null) => {
       setIsChecking(true);
       try {
-        setPreflight(await fetchPublishPreflight(item.id, imageId ?? undefined));
+        setPreflight(await fetchPublishPreflight(item.id, assetIds ?? undefined));
         setError(null);
       } catch (err) {
         setError(errorMessage(err, "Could not check this post."));
@@ -78,19 +80,19 @@ export default function PublishDialog({
   );
 
   useEffect(() => {
-    void runPreflight(chosenImageId);
-  }, [runPreflight, chosenImageId]);
+    void runPreflight(override);
+  }, [runPreflight, override]);
 
   useEffect(() => {
     let cancelled = false;
-    fetchImages(item.id)
-      .then((loaded) => {
-        if (!cancelled) setImages(loaded);
+    fetchMedia(item.id)
+      .then((media) => {
+        if (!cancelled) setLibrary(media.library);
       })
       .catch(() => {
         // The picker is an aid; preflight already reports a missing image as a
         // blocker, so failing to list them must not block publishing.
-        if (!cancelled) setImages([]);
+        if (!cancelled) setLibrary([]);
       });
     return () => {
       cancelled = true;
@@ -114,16 +116,28 @@ export default function PublishDialog({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  const selectedImageId = chosenImageId ?? preflight?.image_id ?? null;
+  // What will actually be sent, in order: the operator's override if they have
+  // touched the picker, otherwise whatever the server says the post holds.
+  const selectedIds = override ?? preflight?.image_ids ?? [];
+  const selectedAssets = selectedIds
+    .map((id) => (library ?? []).find((asset) => asset.id === id))
+    .filter((asset): asset is MediaAsset => asset !== undefined);
+
+  function toggleImage(assetId: string) {
+    const current = selectedIds;
+    if (current.includes(assetId)) {
+      setOverride(current.filter((id) => id !== assetId));
+      return;
+    }
+    if (preflight && current.length >= preflight.max_images) return;
+    setOverride([...current, assetId]);
+  }
 
   async function runPublish() {
     setError(null);
     setIsPublishing(true);
     try {
-      const publication = await publishContent(
-        item.id,
-        selectedImageId ?? undefined,
-      );
+      const publication = await publishContent(item.id, selectedIds);
       setResult(publication);
       if (publication.status === "succeeded") {
         onPublished(publication);
@@ -131,13 +145,13 @@ export default function PublishDialog({
         // A failed attempt comes back 200 with the reason — it is a durable
         // record, not a transport error. Re-check so the button reflects
         // whatever the failure left behind.
-        void runPreflight(chosenImageId);
+        void runPreflight(override);
       }
     } catch (err) {
       // 409 (already live) and 422 (blockers) both land here; both change what
       // preflight would now say.
       setError(errorMessage(err, "Publishing failed."));
-      void runPreflight(chosenImageId);
+      void runPreflight(override);
     } finally {
       setIsPublishing(false);
       setIsArmed(false);
@@ -260,46 +274,74 @@ export default function PublishDialog({
 
               <section className={styles.section}>
                 <div className={styles.sectionHeader}>
-                  <h3 className={styles.sectionTitle}>Image</h3>
+                  <h3 className={styles.sectionTitle}>
+                    Images
+                    {preflight ? (
+                      <span className={styles.imageCount}>
+                        {" "}
+                        {selectedIds.length}/{preflight.max_images}
+                      </span>
+                    ) : null}
+                  </h3>
                   {preflight?.image_required ? (
                     <span className={styles.required}>Required</span>
                   ) : null}
                 </div>
-                {images === null ? (
+                {library === null ? (
                   <p className={styles.muted}>Loading images…</p>
-                ) : images.length === 0 ? (
+                ) : library.length === 0 ? (
                   <p className={styles.muted}>
                     {preflight?.image_required
-                      ? `${label} needs an image — generate one from the Images panel first.`
+                      ? `${label} needs an image — add one from the Media panel first.`
                       : "No image on this post; it will go out as text only."}
                   </p>
                 ) : (
-                  <ul className={styles.thumbs}>
-                    {images.map((image) => (
-                      <li key={image.id}>
-                        <button
-                          type="button"
-                          className={
-                            image.id === selectedImageId
-                              ? styles.thumbActive
-                              : styles.thumb
-                          }
-                          onClick={() => setChosenImageId(image.id)}
-                          aria-pressed={image.id === selectedImageId}
-                          title={image.prompt}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={imageFileUrl(image)}
-                            alt={image.prompt}
-                            width={96}
-                            height={96}
-                            loading="lazy"
-                          />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                  <>
+                    <ul className={styles.thumbs}>
+                      {library.map((image) => {
+                        const position = selectedIds.indexOf(image.id);
+                        const label = image.prompt ?? image.filename ?? "Image";
+                        return (
+                          <li key={image.id}>
+                            <button
+                              type="button"
+                              className={
+                                position !== -1 ? styles.thumbActive : styles.thumb
+                              }
+                              onClick={() => toggleImage(image.id)}
+                              aria-pressed={position !== -1}
+                              // Explicit, so the order badge below does not get
+                              // folded into the button's accessible name —
+                              // `aria-pressed` already carries the selection,
+                              // and the badge is a visual index.
+                              aria-label={label}
+                              title={label}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={imageFileUrl(image)}
+                                alt=""
+                                width={96}
+                                height={96}
+                                loading="lazy"
+                              />
+                              {position !== -1 ? (
+                                <span
+                                  className={styles.thumbOrder}
+                                  aria-hidden="true"
+                                >
+                                  {position + 1}
+                                </span>
+                              ) : null}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <p className={styles.muted}>
+                      The number is the order they will appear in.
+                    </p>
+                  </>
                 )}
               </section>
 
@@ -316,9 +358,16 @@ export default function PublishDialog({
                     </span>
                   ) : null}
                 </div>
-                <pre className={styles.preview}>
-                  {preflight?.text ?? "Loading…"}
-                </pre>
+                {/* The text is the server's own `compose_post_text` output,
+                    handed straight to the preview. Recomposing it here would
+                    make this panel the one thing in the app that can lie about
+                    what is going out. */}
+                <PostPreview
+                  platform={item.platform}
+                  text={preflight?.text ?? ""}
+                  images={selectedAssets}
+                  account={preflight?.account ?? null}
+                />
               </section>
 
               {preflight && preflight.blockers.length > 0 ? (

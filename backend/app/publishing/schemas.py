@@ -46,14 +46,18 @@ class AccountVerificationOut(BaseModel):
 
 
 class PublishRequestBody(BaseModel):
-    image_id: uuid.UUID | None = None
+    # Explicit override of the item's stored selection, in publish order. None
+    # means "use what is saved"; an empty list means "send no images", which is
+    # a real choice and not the same thing.
+    asset_ids: list[uuid.UUID] | None = None
 
 
 class PublicationOut(BaseModel):
     id: str
     content_item_id: str
     social_account_id: str | None
-    content_image_id: str | None
+    # Exactly what went out, in order.
+    media_asset_ids: list[str] = Field(default_factory=list)
     status: str
     external_post_id: str | None
     permalink: str | None
@@ -74,6 +78,8 @@ class PreflightOut(BaseModel):
     char_count: int
     char_limit: int
     hashtag_count: int
-    image_id: str | None
+    # The selection this preflight evaluated, in publish order.
+    image_ids: list[str] = Field(default_factory=list)
     image_required: bool
+    max_images: int
     account: SocialAccountOut | None

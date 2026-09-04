@@ -4,7 +4,9 @@ test("login page renders", async ({ page }) => {
   await page.goto("/login");
   await expect(page.locator("h1")).toHaveText("Social Media Marketing");
   await expect(page.getByLabel("Email")).toBeVisible();
-  await expect(page.getByLabel("Password")).toBeVisible();
+  // Exact, because the reveal toggle beside it is labelled "Show password" and
+  // a substring match resolves to both.
+  await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
 });
 

@@ -12,7 +12,7 @@ from httpx import AsyncClient
 from PIL import Image
 
 from app.db.enums import ContentPlatform, ContentStatus
-from app.db.models import ContentImage, ContentItem
+from app.db.models import ContentItem, MediaAsset
 from app.publishing.media import (
     INSTAGRAM_MAX_WIDTH,
     MediaConversionError,
@@ -129,8 +129,11 @@ async def _store_image(db_sessionmaker, data: bytes) -> uuid.UUID:
         )
         session.add(item)
         await session.flush()
-        image = ContentImage(
-            content_item_id=item.id, prompt="a classroom", model="mock", data=data
+        image = MediaAsset(
+            generation_group=item.generation_group,
+            prompt="a classroom",
+            model="mock",
+            data=data,
         )
         session.add(image)
         await session.commit()

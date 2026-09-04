@@ -11,7 +11,13 @@ from PIL import Image
 from sqlalchemy import select
 
 from app.db.enums import ContentPlatform, ContentStatus, PublishStatus
-from app.db.models import AuditLog, ContentImage, ContentItem, ContentPublication
+from app.db.models import (
+    AuditLog,
+    ContentItem,
+    ContentItemMedia,
+    ContentPublication,
+    MediaAsset,
+)
 from app.publishing.publishers.base import PublishError, PublishResult
 from app.publishing.service import (
     AlreadyPublishedError,
@@ -79,14 +85,70 @@ async def _make_item(
         await session.flush()
         image_id = None
         if with_image:
-            image = ContentImage(
-                content_item_id=item.id, prompt="a bright classroom", model="mock", data=PNG
+            image = MediaAsset(
+                generation_group=item.generation_group,
+                prompt="a bright classroom",
+                model="mock",
+                data=PNG,
             )
             session.add(image)
             await session.flush()
+            # An attached image, not merely an existing one: publishing sends
+            # the item's selection, and "there is a picture in the library"
+            # is deliberately no longer the same statement.
+            session.add(
+                ContentItemMedia(
+                    content_item_id=item.id, media_asset_id=image.id, position=0
+                )
+            )
             image_id = image.id
         await session.commit()
         return item.id, image_id
+
+
+async def _add_asset(
+    db_sessionmaker,
+    item_id: uuid.UUID,
+    *,
+    data: bytes = PNG,
+    prompt: str = "a bright classroom",
+    attach: bool = True,
+    created_at: dt.datetime | None = None,
+) -> uuid.UUID:
+    """Put one asset in the item's library, selected unless told otherwise.
+
+    `attach=False` is the interesting case: an asset that exists but is not
+    part of the post. Since D11 that is a real and reachable state, and it must
+    mean the image does not go out.
+    """
+    async with db_sessionmaker() as session:
+        item = await session.get(ContentItem, item_id)
+        asset = MediaAsset(
+            generation_group=item.generation_group,
+            prompt=prompt,
+            model="mock",
+            data=data,
+            **({"created_at": created_at} if created_at else {}),
+        )
+        session.add(asset)
+        await session.flush()
+        if attach:
+            existing = (
+                await session.execute(
+                    select(ContentItemMedia).where(
+                        ContentItemMedia.content_item_id == item_id
+                    )
+                )
+            ).scalars().all()
+            session.add(
+                ContentItemMedia(
+                    content_item_id=item_id,
+                    media_asset_id=asset.id,
+                    position=len(existing),
+                )
+            )
+        await session.commit()
+        return asset.id
 
 
 def _service(session, publisher=None, **overrides) -> PublishService:
@@ -167,13 +229,16 @@ async def test_publish_passes_a_signed_url_and_jpeg_bytes(
     )
 
     request = publisher.requests[0]
-    assert request.image_url is not None
-    assert str(image_id) in request.image_url
-    assert "sig=" in request.image_url
-    assert request.image_bytes is not None
-    assert request.image_bytes.startswith(JPEG_MAGIC)
-    assert request.image_bytes != PNG  # converted, not the stored PNG
-    assert publication.content_image_id == image_id
+    assert len(request.images) == 1
+    image = request.images[0]
+    assert image.url is not None
+    assert str(image_id) in image.url
+    assert "sig=" in image.url
+    assert image.data.startswith(JPEG_MAGIC)
+    assert image.data != PNG  # converted, not the stored PNG
+
+    media = await _service(db_session).published_media_ids([publication.id])
+    assert media[publication.id] == [str(image_id)]
 
 
 async def test_an_unreadable_image_is_refused_before_any_attempt(
@@ -181,16 +246,7 @@ async def test_an_unreadable_image_is_refused_before_any_attempt(
 ) -> None:
     # A refusal, not a failed publish: nothing was sent, so nothing is recorded.
     item_id, _ = await _make_item(db_sessionmaker, with_image=False)
-    async with db_sessionmaker() as session:
-        session.add(
-            ContentImage(
-                content_item_id=item_id,
-                prompt="corrupt",
-                model="mock",
-                data=b"not an image",
-            )
-        )
-        await session.commit()
+    await _add_asset(db_sessionmaker, item_id, data=b"not an image", prompt="corrupt")
     await connect_social_account(db_sessionmaker, ContentPlatform.facebook)
 
     with pytest.raises(PublishNotAllowedError, match="not a readable image"):
@@ -222,16 +278,12 @@ async def test_instagram_blocks_an_image_shaped_outside_its_spec(
     item_id, _ = await _make_item(
         db_sessionmaker, platform=ContentPlatform.instagram, with_image=False
     )
-    async with db_sessionmaker() as session:
-        session.add(
-            ContentImage(
-                content_item_id=item_id,
-                prompt="a very tall image",
-                model="mock",
-                data=buffer.getvalue(),
-            )
-        )
-        await session.commit()
+    await _add_asset(
+        db_sessionmaker,
+        item_id,
+        data=buffer.getvalue(),
+        prompt="a very tall image",
+    )
     await connect_social_account(db_sessionmaker, ContentPlatform.instagram)
 
     with pytest.raises(PublishNotAllowedError, match="ratio"):
@@ -267,34 +319,54 @@ async def test_publish_still_works_without_a_public_host(
     ).publish(item_id, actor_id=uuid.uuid4())
 
     assert publication.status is PublishStatus.succeeded
-    assert publisher.requests[0].image_url is None
-    assert publisher.requests[0].image_bytes is not None
-    assert publisher.requests[0].image_bytes.startswith(JPEG_MAGIC)
+    assert publisher.requests[0].images[0].url is None
+    assert publisher.requests[0].images[0].data.startswith(JPEG_MAGIC)
 
 
-async def test_publish_uses_the_latest_image_when_none_is_given(
+async def test_publish_sends_the_selection_in_order_not_the_newest_image(
     db_session, db_sessionmaker
 ) -> None:
+    # Before D11 the *most recent* image went out, silently. Now the post sends
+    # what is selected, in the selected order — so a newer image added to the
+    # library afterwards does not quietly displace the chosen one.
     item_id, first_image_id = await _make_item(db_sessionmaker, with_image=True)
-    async with db_sessionmaker() as session:
-        newer = ContentImage(
-            content_item_id=item_id,
-            prompt="a newer image",
-            model="mock",
-            data=PNG,
-            created_at=dt.datetime.now(dt.UTC) + dt.timedelta(minutes=5),
-        )
-        session.add(newer)
-        await session.commit()
-        newer_id = newer.id
+    second_id = await _add_asset(db_sessionmaker, item_id, prompt="a second image")
+    await _add_asset(
+        db_sessionmaker,
+        item_id,
+        prompt="a newer image nobody selected",
+        attach=False,
+        created_at=dt.datetime.now(dt.UTC) + dt.timedelta(minutes=5),
+    )
     await connect_social_account(db_sessionmaker, ContentPlatform.facebook)
+    publisher = RecordingPublisher()
 
-    publication = await _service(db_session, RecordingPublisher()).publish(
+    publication = await _service(db_session, publisher).publish(
         item_id, actor_id=uuid.uuid4()
     )
 
-    assert publication.content_image_id == newer_id
-    assert publication.content_image_id != first_image_id
+    media = await _service(db_session).published_media_ids([publication.id])
+    assert media[publication.id] == [str(first_image_id), str(second_id)]
+    assert len(publisher.requests[0].images) == 2
+
+
+async def test_an_unselected_image_is_not_published(
+    db_session, db_sessionmaker
+) -> None:
+    # The other half of the same rule: an asset sitting in the library that
+    # nobody ticked must not reach the network.
+    item_id, _ = await _make_item(db_sessionmaker, with_image=False)
+    await _add_asset(db_sessionmaker, item_id, prompt="never chosen", attach=False)
+    await connect_social_account(db_sessionmaker, ContentPlatform.facebook)
+    publisher = RecordingPublisher()
+
+    publication = await _service(db_session, publisher).publish(
+        item_id, actor_id=uuid.uuid4()
+    )
+
+    assert publisher.requests[0].images == ()
+    media = await _service(db_session).published_media_ids([publication.id])
+    assert media == {}
 
 
 async def test_publish_writes_an_audit_row(db_session, db_sessionmaker) -> None:
@@ -403,16 +475,18 @@ async def test_publishing_twice_is_refused_and_reports_the_permalink(
     assert excinfo.value.permalink == "https://www.facebook.com/page_abc123"
 
 
-async def test_an_image_from_another_post_is_rejected(
+async def test_an_image_from_another_generation_is_rejected(
     db_session, db_sessionmaker
 ) -> None:
+    # The library is scoped to the generation group, so an asset from an
+    # unrelated generation is not merely unselected — it is not on offer.
     item_id, _ = await _make_item(db_sessionmaker)
     _, other_image_id = await _make_item(db_sessionmaker, with_image=True)
     await connect_social_account(db_sessionmaker, ContentPlatform.facebook)
 
     with pytest.raises(ImageNotFoundError):
         await _service(db_session, RecordingPublisher()).publish(
-            item_id, actor_id=uuid.uuid4(), image_id=other_image_id
+            item_id, actor_id=uuid.uuid4(), asset_ids=[other_image_id]
         )
 
 

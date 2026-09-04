@@ -190,7 +190,7 @@ async def test_preflight_404s_for_an_unknown_item(auth_client: AsyncClient) -> N
     assert response.status_code == 404
 
 
-async def test_preflight_404s_for_an_image_from_another_post(
+async def test_preflight_404s_for_an_image_from_another_generation(
     auth_client: AsyncClient,
 ) -> None:
     item_id = await _approved_item(auth_client)
@@ -198,11 +198,11 @@ async def test_preflight_404s_for_an_image_from_another_post(
     foreign_image_id = await _add_image(auth_client, other_item_id)
 
     response = await auth_client.get(
-        f"/api/content/{item_id}/publish/preflight?image_id={foreign_image_id}"
+        f"/api/content/{item_id}/publish/preflight?asset_ids={foreign_image_id}"
     )
 
     assert response.status_code == 404
-    assert "does not belong" in response.json()["detail"]
+    assert "not available" in response.json()["detail"]
 
 
 # ── publish ──
@@ -234,11 +234,11 @@ async def test_publish_with_an_explicit_image(
     await connect_social_account(db_sessionmaker, ContentPlatform.instagram)
 
     response = await auth_client.post(
-        f"/api/content/{item_id}/publish", json={"image_id": image_id}
+        f"/api/content/{item_id}/publish", json={"asset_ids": [image_id]}
     )
 
     assert response.status_code == 200, response.text
-    assert response.json()["content_image_id"] == image_id
+    assert response.json()["media_asset_ids"] == [image_id]
 
 
 async def test_publish_422s_on_preflight_blockers(auth_client: AsyncClient) -> None:
@@ -266,7 +266,7 @@ async def test_publish_404s_for_an_unknown_item(auth_client: AsyncClient) -> Non
     assert response.status_code == 404
 
 
-async def test_publish_404s_for_an_image_from_another_post(
+async def test_publish_404s_for_an_image_from_another_generation(
     auth_client: AsyncClient, db_sessionmaker
 ) -> None:
     item_id = await _approved_item(auth_client)
@@ -275,7 +275,7 @@ async def test_publish_404s_for_an_image_from_another_post(
     await connect_social_account(db_sessionmaker, ContentPlatform.facebook)
 
     response = await auth_client.post(
-        f"/api/content/{item_id}/publish", json={"image_id": foreign_image_id}
+        f"/api/content/{item_id}/publish", json={"asset_ids": [foreign_image_id]}
     )
 
     assert response.status_code == 404
@@ -297,7 +297,7 @@ async def test_publications_history_lists_the_attempt(
     history = response.json()
     assert len(history) == 1
     assert history[0]["status"] == "succeeded"
-    assert history[0]["request_summary"]["has_image"] is False
+    assert history[0]["request_summary"]["image_count"] == 0
 
 
 async def test_publications_history_is_empty_before_publishing(

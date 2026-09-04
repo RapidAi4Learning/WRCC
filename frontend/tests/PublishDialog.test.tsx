@@ -3,13 +3,13 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import PublishDialog from "@/components/PublishDialog";
-import type { ContentImage, ContentItem } from "@/types/content";
+import type { MediaAsset, ContentItem } from "@/types/content";
 import type { Publication, PublishPreflight } from "@/types/publishing";
 
-const { mockPreflight, mockPublish, mockFetchImages } = vi.hoisted(() => ({
+const { mockPreflight, mockPublish, mockFetchMedia } = vi.hoisted(() => ({
   mockPreflight: vi.fn(),
   mockPublish: vi.fn(),
-  mockFetchImages: vi.fn(),
+  mockFetchMedia: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -23,8 +23,8 @@ vi.mock("@/lib/api", () => ({
   },
   fetchPublishPreflight: mockPreflight,
   publishContent: mockPublish,
-  fetchImages: mockFetchImages,
-  imageFileUrl: (image: ContentImage) => `http://api.test${image.file_url}`,
+  fetchMedia: mockFetchMedia,
+  imageFileUrl: (image: MediaAsset) => `http://api.test${image.file_url}`,
 }));
 
 // next/link needs an app-router context that vitest does not mount; the anchor
@@ -69,8 +69,9 @@ function preflight(overrides: Partial<PublishPreflight> = {}): PublishPreflight 
     char_count: 48,
     char_limit: 63206,
     hashtag_count: 2,
-    image_id: null,
+    image_ids: [],
     image_required: false,
+    max_images: 10,
     account: {
       id: "acct-1",
       platform: "facebook",
@@ -92,7 +93,7 @@ function publication(overrides: Partial<Publication> = {}): Publication {
     id: "pub-1",
     content_item_id: "item-1",
     social_account_id: "acct-1",
-    content_image_id: null,
+    media_asset_ids: [],
     status: "succeeded",
     external_post_id: "page-1_999",
     permalink: "https://facebook.com/page-1_999",
@@ -105,22 +106,41 @@ function publication(overrides: Partial<Publication> = {}): Publication {
   };
 }
 
-function image(overrides: Partial<ContentImage> = {}): ContentImage {
+function image(overrides: Partial<MediaAsset> = {}): MediaAsset {
   return {
     id: "img-1",
-    content_item_id: "item-1",
+    source: "generated",
     prompt: "Students in a classroom",
     model: "mock",
+    filename: null,
+    mime_type: "image/png",
+    width: 1024,
+    height: 1024,
+    byte_size: 1024,
+    alt_text: null,
     created_at: "2026-08-01T00:00:00Z",
-    file_url: "/api/content/item-1/images/img-1/file",
+    file_url: "/api/content/images/img-1/file",
     ...overrides,
+  };
+}
+
+/** The media endpoint's shape: library plus this post's ordered selection. */
+function media(library: MediaAsset[] = [], selected: string[] = []) {
+  return {
+    library,
+    selection: selected.map((id, position) => ({
+      media_asset_id: id,
+      position,
+      alt_text: null,
+    })),
+    max_images: 10,
   };
 }
 
 beforeEach(() => {
   mockPreflight.mockResolvedValue(preflight());
   mockPublish.mockResolvedValue(publication());
-  mockFetchImages.mockResolvedValue([]);
+  mockFetchMedia.mockResolvedValue(media());
 });
 
 afterEach(() => {
@@ -140,9 +160,13 @@ describe("PublishDialog — what will be sent", () => {
       <PublishDialog item={item()} onClose={vi.fn()} onPublished={vi.fn()} />,
     );
 
-    expect(
-      await screen.findByText("Western Riverina Community College"),
-    ).toBeInTheDocument();
+    // Twice on purpose since the preview arrived: once as the destination, and
+    // once as the author in the mock-up of the post itself.
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("Western Riverina Community College"),
+      ).toHaveLength(2),
+    );
     expect(screen.getByText("@wrcc")).toBeInTheDocument();
   });
 
@@ -237,7 +261,7 @@ describe("PublishDialog — the gate", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Yes, publish now" }));
-    await waitFor(() => expect(mockPublish).toHaveBeenCalledWith("item-1", undefined));
+    await waitFor(() => expect(mockPublish).toHaveBeenCalledWith("item-1", []));
   });
 
   it("backs out of the confirmation without publishing", async () => {
@@ -277,44 +301,141 @@ describe("PublishDialog — the image", () => {
     expect(await screen.findByText(/needs an image/i)).toBeInTheDocument();
   });
 
-  it("re-checks against the image the operator picks", async () => {
-    mockFetchImages.mockResolvedValue([
-      image({ id: "img-1", prompt: "Classroom" }),
-      image({ id: "img-2", prompt: "Graduation" }),
-    ]);
-    mockPreflight.mockResolvedValue(preflight({ image_id: "img-2" }));
+  it("shows the post's saved selection as already ticked", async () => {
+    mockFetchMedia.mockResolvedValue(
+      media(
+        [
+          image({ id: "img-1", prompt: "Classroom" }),
+          image({ id: "img-2", prompt: "Graduation" }),
+        ],
+        ["img-2"],
+      ),
+    );
+    mockPreflight.mockResolvedValue(preflight({ image_ids: ["img-2"] }));
 
     render(
       <PublishDialog item={item()} onClose={vi.fn()} onPublished={vi.fn()} />,
     );
 
-    // The server picked the latest; that is what the dialog shows as selected.
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Graduation" })).toHaveAttribute(
         "aria-pressed",
         "true",
       ),
     );
-
-    fireEvent.click(screen.getByRole("button", { name: "Classroom" }));
-
-    await waitFor(() =>
-      expect(mockPreflight).toHaveBeenLastCalledWith("item-1", "img-1"),
+    expect(screen.getByRole("button", { name: "Classroom" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
     );
   });
 
-  it("publishes with the picked image, not the server default", async () => {
-    mockFetchImages.mockResolvedValue([image({ id: "img-1", prompt: "Classroom" })]);
-    mockPreflight.mockResolvedValue(preflight({ image_id: "img-1" }));
+  it("re-checks against the selection the operator builds", async () => {
+    mockFetchMedia.mockResolvedValue(
+      media(
+        [
+          image({ id: "img-1", prompt: "Classroom" }),
+          image({ id: "img-2", prompt: "Graduation" }),
+        ],
+        ["img-2"],
+      ),
+    );
+    mockPreflight.mockResolvedValue(preflight({ image_ids: ["img-2"] }));
 
     render(
       <PublishDialog item={item()} onClose={vi.fn()} onPublished={vi.fn()} />,
     );
 
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Graduation" })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Classroom" }));
+
+    // Adding, not replacing: the server re-evaluates the whole set, in order.
+    await waitFor(() =>
+      expect(mockPreflight).toHaveBeenLastCalledWith("item-1", ["img-2", "img-1"]),
+    );
+  });
+
+  it("unticking an image sends an empty selection, not the saved one", async () => {
+    // The distinction the API keeps: "no images" is an instruction, and must
+    // not be read as "use whatever is saved".
+    mockFetchMedia.mockResolvedValue(
+      media([image({ id: "img-1", prompt: "Classroom" })], ["img-1"]),
+    );
+    mockPreflight.mockResolvedValue(preflight({ image_ids: ["img-1"] }));
+
+    render(
+      <PublishDialog item={item()} onClose={vi.fn()} onPublished={vi.fn()} />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Classroom" })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Classroom" }));
+
+    await waitFor(() =>
+      expect(mockPreflight).toHaveBeenLastCalledWith("item-1", []),
+    );
+  });
+
+  it("refuses to tick more images than the platform accepts", async () => {
+    mockFetchMedia.mockResolvedValue(
+      media(
+        [
+          image({ id: "img-1", prompt: "Classroom" }),
+          image({ id: "img-2", prompt: "Graduation" }),
+        ],
+        ["img-1"],
+      ),
+    );
+    mockPreflight.mockResolvedValue(
+      preflight({ image_ids: ["img-1"], max_images: 1 }),
+    );
+
+    render(
+      <PublishDialog item={item()} onClose={vi.fn()} onPublished={vi.fn()} />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Graduation" })).toBeInTheDocument(),
+    );
+    mockPreflight.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Graduation" }));
+
+    expect(screen.getByRole("button", { name: "Graduation" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(mockPreflight).not.toHaveBeenCalled();
+  });
+
+  it("publishes the selection in the order it was built", async () => {
+    mockFetchMedia.mockResolvedValue(
+      media(
+        [
+          image({ id: "img-1", prompt: "Classroom" }),
+          image({ id: "img-2", prompt: "Graduation" }),
+        ],
+        ["img-2"],
+      ),
+    );
+    mockPreflight.mockResolvedValue(preflight({ image_ids: ["img-2"] }));
+
+    render(
+      <PublishDialog item={item()} onClose={vi.fn()} onPublished={vi.fn()} />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Classroom" })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Classroom" }));
+
     fireEvent.click(await readyButton());
     fireEvent.click(screen.getByRole("button", { name: "Yes, publish now" }));
 
-    await waitFor(() => expect(mockPublish).toHaveBeenCalledWith("item-1", "img-1"));
+    await waitFor(() =>
+      expect(mockPublish).toHaveBeenCalledWith("item-1", ["img-2", "img-1"]),
+    );
   });
 });
 

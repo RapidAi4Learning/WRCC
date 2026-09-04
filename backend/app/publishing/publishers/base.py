@@ -54,17 +54,32 @@ class ResolvedAccount:
 
 
 @dataclass(frozen=True, slots=True)
+class PublishImage:
+    """One image on its way out, in both the forms a network might want."""
+
+    # Always JPEG, converted once by the service, so every network receives
+    # exactly the bytes the signed URL would serve.
+    data: bytes
+    # Signed, short-lived, publicly fetchable. Instagram can use nothing else;
+    # Facebook and LinkedIn upload `data` instead. None when this backend has
+    # no public origin configured — which is Instagram's problem alone.
+    url: str | None = None
+    alt: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class PublishRequest:
     text: str
     account: ResolvedAccount
-    # Signed, short-lived, publicly fetchable. Instagram can use nothing else;
-    # Facebook and LinkedIn upload `image_bytes` instead.
-    image_url: str | None = None
-    # Always JPEG, converted once by the service, so every network receives
-    # exactly the bytes the signed URL would serve.
-    image_bytes: bytes | None = None
-    image_alt: str | None = None
+    # In publish order: on a carousel this is the sequence the reader scrolls,
+    # and on Instagram the first image's aspect ratio crops all the rest.
+    images: tuple[PublishImage, ...] = ()
     link: str | None = None
+
+    @property
+    def first_image(self) -> PublishImage | None:
+        """Convenience for the single-image paths, which stay unchanged."""
+        return self.images[0] if self.images else None
 
 
 @dataclass(frozen=True, slots=True)
