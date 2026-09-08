@@ -171,7 +171,9 @@ export default function VariantCard({
       show: item.status === "pending_approval",
     },
     {
-      label: "Publish",
+      // Opens the preflight dialog, which is where the actual publish is
+      // confirmed — so the card's button promises a look, not a post.
+      label: "Preview",
       onClick: () => setIsPublishOpen(true),
       show: item.status === "approved",
       // Disabled rather than hidden: a missing button reads as a bug, and the

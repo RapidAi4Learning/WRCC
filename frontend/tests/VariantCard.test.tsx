@@ -133,12 +133,12 @@ describe("VariantCard publishing", () => {
     };
   }
 
-  it("offers Publish only once the post is approved", () => {
+  it("offers Preview only once the post is approved", () => {
     const { rerender } = render(<VariantCard item={item()} onChange={vi.fn()} />);
-    expect(screen.queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Preview" })).not.toBeInTheDocument();
 
     rerender(<VariantCard item={item({ status: "approved" })} onChange={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "Publish" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview" })).toBeInTheDocument();
   });
 
   it("opens the publish dialog rather than posting straight from the card", async () => {
@@ -157,7 +157,7 @@ describe("VariantCard publishing", () => {
     });
 
     render(<VariantCard item={item({ status: "approved" })} onChange={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     await waitFor(() => expect(mockPreflight).toHaveBeenCalledWith("item-1", undefined));
@@ -165,7 +165,7 @@ describe("VariantCard publishing", () => {
     expect(mockPublish).not.toHaveBeenCalled();
   });
 
-  it("keeps Publish disabled for a platform that is on hold", () => {
+  it("keeps Preview disabled for a platform that is on hold", () => {
     render(
       <VariantCard
         item={item({ platform: "linkedin", status: "approved" })}
@@ -173,7 +173,7 @@ describe("VariantCard publishing", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Preview" })).toBeDisabled();
     expect(screen.getByText(/until our LinkedIn app is verified/i)).toBeInTheDocument();
   });
 
@@ -185,7 +185,7 @@ describe("VariantCard publishing", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(mockPreflight).not.toHaveBeenCalled();
@@ -198,10 +198,11 @@ describe("VariantCard publishing", () => {
     expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Duplicate" })).toBeInTheDocument();
     // What must not: editing or regenerating would put our copy out of step
-    // with what is already on the network, and Publish would post it twice.
+    // with what is already on the network, and Preview would offer to post it
+    // a second time.
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Regenerate" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Publish" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Preview" })).not.toBeInTheDocument();
 
     await waitFor(() => expect(mockFetchPublications).toHaveBeenCalledWith("item-1"));
   });

@@ -129,7 +129,7 @@ describe("MediaPanel — generate and upload are separate actions", () => {
     mockGenerate.mockResolvedValue(asset());
     await open();
 
-    fireEvent.change(screen.getByLabelText("Prompt"), {
+    fireEvent.change(screen.getByLabelText("Edit suggestion or create prompt"), {
       target: { value: "A bright classroom" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Generate image" }));

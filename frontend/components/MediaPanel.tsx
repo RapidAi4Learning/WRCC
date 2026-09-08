@@ -339,7 +339,7 @@ export default function MediaPanel({ itemId, onCountChange }: MediaPanelProps) {
                     onClick={() => void loadSuggestions()}
                     disabled={isSuggesting}
                   >
-                    {isSuggesting ? "Thinking…" : "↻ New ideas"}
+                    {isSuggesting ? "Thinking…" : "↻ Regenerate"}
                   </button>
                 </div>
 
@@ -367,7 +367,7 @@ export default function MediaPanel({ itemId, onCountChange }: MediaPanelProps) {
                 ))}
 
                 <label className={styles.sectionTitle} htmlFor={`prompt-${itemId}`}>
-                  Prompt
+                  Edit suggestion or create prompt
                 </label>
                 <textarea
                   id={`prompt-${itemId}`}
