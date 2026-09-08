@@ -107,7 +107,7 @@ export default function GeneratePage() {
       <div className={styles.workspace}>
       <form className={styles.form} onSubmit={handleSubmit}>
         <fieldset className={styles.fieldset}>
-          <legend className={styles.legend}>1 · Ground it</legend>
+          <legend className={styles.legend}>1 · Create a post</legend>
           <label className={styles.label}>Course from the catalog</label>
           <CoursePicker selected={course} onSelect={setCourse} />
 
