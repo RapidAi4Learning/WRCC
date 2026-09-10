@@ -16,13 +16,13 @@
 }
 
 .name[data-platform="facebook"] {
-  color: var(--color-facebook);
+  color: var(--color-facebook-ink);
 }
 
 .name[data-platform="instagram"] {
-  color: var(--color-instagram);
+  color: var(--color-instagram-ink);
 }
 
 .name[data-platform="linkedin"] {
-  color: var(--color-linkedin);
+  color: var(--color-linkedin-ink);
 }

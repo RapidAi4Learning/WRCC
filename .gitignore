@@ -20,4 +20,9 @@ playwright-report/
 # Env & local
 .env
 .env.local
+# Every other .env variant too: scripts/make_env.py writes one full of freshly
+# generated secrets, and the default name (.env.production) was not covered by
+# the two lines above.
+.env.*
+!.env.example
 *.log

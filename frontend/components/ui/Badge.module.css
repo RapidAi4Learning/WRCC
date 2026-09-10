@@ -75,17 +75,17 @@
 }
 
 .facebook {
-  color: var(--color-facebook);
+  color: var(--color-facebook-ink);
   background: color-mix(in srgb, var(--color-facebook) 12%, transparent);
 }
 
 .instagram {
-  color: var(--color-instagram);
+  color: var(--color-instagram-ink);
   background: color-mix(in srgb, var(--color-instagram) 12%, transparent);
 }
 
 .linkedin {
-  color: var(--color-linkedin);
+  color: var(--color-linkedin-ink);
   background: color-mix(in srgb, var(--color-linkedin) 12%, transparent);
 }
 

@@ -158,37 +158,34 @@ function SectionBlock({
   const visible = showAll ? items : items.slice(0, INITIAL_VISIBLE);
   const hidden = items.length - visible.length;
 
+  const titleId = `sync-section-${key}`;
+
   return (
-    <details
-      className={styles.section}
-      data-tone={SECTION_TONES[key]}
-      open={isOpen}
-      onToggle={(event) => setIsOpen(event.currentTarget.open)}
-    >
-      <summary className={styles.sectionSummary}>
-        <span className={styles.sectionTitle}>{SECTION_TITLES[key]}</span>
-        <Badge
-          tone={COUNT_TONES[SECTION_TONES[key]] ?? "neutral"}
-          className={styles.sectionCount}
-        >
-          {skippedHere > 0
-            ? `${items.length - skippedHere} of ${items.length}`
-            : items.length}
-        </Badge>
-        <Button
-          size="sm"
-          disabled={isBusy}
-          // Inside a summary, so the click must not also fold the section.
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onToggleSection(section, !allSkipped);
-          }}
-        >
-          {allSkipped ? "Include all" : "Skip all"}
-        </Button>
-      </summary>
-      <ul className={styles.items}>
+    // The bulk button sits beside the <summary>, not inside it: a summary is
+    // itself the toggle, and a control nested in a control is announced
+    // wrongly and fires both. It cannot live elsewhere inside the <details>
+    // either — a closed <details> hides everything but its summary.
+    <div className={styles.sectionWrap}>
+      <details
+        className={styles.section}
+        data-tone={SECTION_TONES[key]}
+        open={isOpen}
+        onToggle={(event) => setIsOpen(event.currentTarget.open)}
+      >
+        <summary className={styles.sectionSummary}>
+          <span id={titleId} className={styles.sectionTitle}>
+            {SECTION_TITLES[key]}
+          </span>
+          <Badge
+            tone={COUNT_TONES[SECTION_TONES[key]] ?? "neutral"}
+            className={styles.sectionCount}
+          >
+            {skippedHere > 0
+              ? `${items.length - skippedHere} of ${items.length}`
+              : items.length}
+          </Badge>
+        </summary>
+        <ul className={styles.items}>
         {visible.map((item) => {
           const itemKey = skipKey(key, item.code);
           return (
@@ -202,16 +199,27 @@ function SectionBlock({
           );
         })}
       </ul>
-      {hidden > 0 ? (
-        <button
-          type="button"
-          className={styles.showAll}
-          onClick={() => setShowAll(true)}
-        >
-          Show the remaining {hidden}
-        </button>
-      ) : null}
-    </details>
+        {hidden > 0 ? (
+          <button
+            type="button"
+            className={styles.showAll}
+            onClick={() => setShowAll(true)}
+          >
+            Show the remaining {hidden}
+          </button>
+        ) : null}
+      </details>
+      <Button
+        size="sm"
+        className={styles.bulk}
+        disabled={isBusy}
+        // Several sections each have one; the description says which.
+        aria-describedby={titleId}
+        onClick={() => onToggleSection(section, !allSkipped)}
+      >
+        {allSkipped ? "Include all" : "Skip all"}
+      </Button>
+    </div>
   );
 }
 

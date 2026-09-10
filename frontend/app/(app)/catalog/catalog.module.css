@@ -54,6 +54,16 @@
   white-space: nowrap;
 }
 
+.tableScroll {
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+}
+
+.tableScroll:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

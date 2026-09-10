@@ -187,6 +187,14 @@ export default function CatalogPage() {
               {expanded && expanded.offerings.length === 0 ? (
                 <EmptyState size="sm">No scheduled offerings.</EmptyState>
               ) : (
+                // Scrolls sideways on a phone, so it must be reachable by
+                // keyboard: a focusable, named region.
+                <div
+                  className={styles.tableScroll}
+                  role="region"
+                  aria-label={`${course.title} — scheduled dates`}
+                  tabIndex={0}
+                >
                 <table className={styles.table}>
                   <thead>
                     <tr>
@@ -219,6 +227,7 @@ export default function CatalogPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </DisclosureRow>
           ))}

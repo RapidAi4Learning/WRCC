@@ -26,9 +26,12 @@
   --color-field: #fcfbfd;
   --color-border: #e3d8ec;
   --color-border-strong: #cfbadf;
+  /* A field's border is the only thing that shows where it is, so it needs
+     3:1 against the surface (WCAG 1.4.11); card borders are decoration. */
+  --color-border-input: #968aac;
   --color-text: #2a2233;
   --color-text-muted: #6a6275;
-  --color-placeholder: #9a92a6;
+  --color-placeholder: #756d82;
 
   /* Accent = brand purple: links, focus, selection, emphasis. */
   --color-accent: var(--brand-purple-700);
@@ -43,6 +46,9 @@
   --color-cta-soft: var(--brand-lime-100);
   --color-on-cta: var(--brand-purple-900);
   --color-cta-text: var(--brand-lime-700);
+  /* Outline of a selected chip or tab: the brand lime darkened just enough
+     to reach 3:1 on white, since it is what marks the state. */
+  --color-cta-border: #8a9726;
 
   /* Semantics. */
   --color-success: #4d6a0f;
@@ -56,10 +62,16 @@
   --color-overlay: rgb(42 18 60 / 0.45);
   --color-scrim: rgb(30 14 44 / 0.55);
 
-  /* Platform identities (used semantically on badges/cards). */
+  /* Platform identities: the brand colour for marks, tints and rules; the
+     "ink" step for text, darkened where the brand colour misses 4.5:1. */
   --color-facebook: #1877f2;
   --color-instagram: #c13584;
   --color-linkedin: #0a66c2;
+  /* Deep enough to hold 4.5:1 on its own 12% tint even when that tint sits on
+     a lime or lavender surface (the badge background is translucent). */
+  --color-facebook-ink: #1259bf;
+  --color-instagram-ink: #b02a76;
+  --color-linkedin-ink: #0a66c2;
 
   /* Type. Figtree for text, Outfit for display — both self-hosted by
      next/font, which defines the two variables on <html>. */

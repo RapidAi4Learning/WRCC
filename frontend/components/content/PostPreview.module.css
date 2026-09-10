@@ -14,14 +14,17 @@
 
 .frame[data-platform="facebook"] {
   --preview-accent: var(--color-facebook);
+  --preview-ink: var(--color-facebook-ink);
 }
 
 .frame[data-platform="instagram"] {
   --preview-accent: var(--color-instagram);
+  --preview-ink: var(--color-instagram-ink);
 }
 
 .frame[data-platform="linkedin"] {
   --preview-accent: var(--color-linkedin);
+  --preview-ink: var(--color-linkedin-ink);
 }
 
 .chromeLabel {
@@ -55,7 +58,9 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: var(--preview-accent);
+  /* The ink step, not the brand colour: white initials on Facebook's own
+     blue miss 4.5:1. */
+  background: var(--preview-ink, var(--preview-accent));
   color: var(--color-on-accent);
   font-size: 0.7rem;
   font-weight: 700;
@@ -108,8 +113,9 @@
   margin-right: 0.35em;
 }
 
+/* Text, so it takes the ink step: the network's own blue misses 4.5:1. */
 .hashtag {
-  color: var(--preview-accent);
+  color: var(--preview-ink, var(--color-accent));
 }
 
 .more {

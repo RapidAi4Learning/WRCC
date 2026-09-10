@@ -36,7 +36,7 @@
 }
 
 .tab[aria-selected="true"] {
-  border-color: var(--color-cta);
+  border-color: var(--color-cta-border);
   background: var(--color-cta-soft);
   font-weight: 600;
 }

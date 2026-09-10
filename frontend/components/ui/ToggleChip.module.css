@@ -31,9 +31,9 @@
 }
 
 .chip:has(.input:checked) {
-  border-color: var(--color-cta);
+  border-color: var(--color-cta-border);
   background: var(--color-cta-soft);
-  box-shadow: inset 0 0 0 1px var(--color-cta);
+  box-shadow: inset 0 0 0 1px var(--color-cta-border);
 }
 
 .chip:has(.input:focus-visible) {

@@ -8,7 +8,11 @@
 import type { Page, Route } from "@playwright/test";
 
 const DAY_MS = 86_400_000;
-const NOW = Date.now();
+// A fixed "now", mirrored in the browser with page.clock, so relative dates
+// ("Expires in 5 days", "Crawled 15 min ago") read the same on every run and
+// screenshots can be compared pixel for pixel.
+export const FIXED_NOW = new Date("2026-09-10T09:00:00+10:00");
+const NOW = FIXED_NOW.getTime();
 const iso = (offsetDays = 0) => new Date(NOW + offsetDays * DAY_MS).toISOString();
 
 const USER = {

@@ -87,12 +87,24 @@ wrcc-content-studio/
 │   ├── migrations/versions/
 │   └── tests/  (+ tests/fixtures/wrcc/*.html)
 └── frontend/
-    ├── package.json, next.config.mjs, tsconfig.json
+    ├── package.json, next.config.mjs, tsconfig.json, middleware.ts
     ├── app/
-    │   ├── generate/page.tsx             # compose: curso o topic/URL/notas
-    │   ├── history/page.tsx              # historial + filtros + acciones
-    │   └── catalog/page.tsx              # cursos + sync + approve/reject
-    ├── components/ , lib/api.ts , styles/
+    │   ├── login/page.tsx
+    │   └── (app)/                        # shell autenticado: header + fondo
+    │       ├── generate/page.tsx         # compose: curso o topic/URL/notas
+    │       ├── history/page.tsx          # historial + filtros + acciones
+    │       ├── catalog/page.tsx          # cursos + sync + approve/reject
+    │       ├── settings/page.tsx         # conexiones a las redes
+    │       └── ui-kit/page.tsx           # galería de primitivos (solo dev)
+    ├── components/
+    │   ├── ui/        # kit compartido: Button, Field, Modal, Tabs… (UI-PLAN.md)
+    │   ├── icons/     # marcas de las redes + iconos lucide en uso
+    │   ├── layout/    # AppHeader, UserMenu, NavLinks, BrandLogo, PageBackground
+    │   ├── content/   # VariantCard, MediaPanel, PublishDialog, PostPreview…
+    │   └── catalog/   # SyncReviewPanel
+    ├── styles/tokens.css                 # única fuente de color, tipo y espacio
+    ├── lib/ , hooks/ , types/
+    └── e2e/           # smoke, ui (layout + regresión visual), a11y (axe), visual
 ```
 
 ---
@@ -285,17 +297,24 @@ Todas las rutas requieren sesión salvo `/api/health` y `/api/auth/login`.
 | `POST /api/courses/sync` · `GET /api/courses/sync/{run_id}` · `POST .../approve` · `POST .../reject` | sync HITL |
 | `GET /api/health` | |
 
-## 8. Frontend (4 páginas)
+## 8. Frontend (5 páginas)
+
+Diseño: sistema de marca WRCC (colores oficiales, Outfit + Figtree, kit de
+componentes en `components/ui`). El porqué y el cómo están en
+[`UI-PLAN.md`](UI-PLAN.md).
 
 0. **Login** — form email/contraseña; `middleware.ts` redirige aquí sin
-   sesión; el resto de páginas muestran el usuario y un logout.
+   sesión; el resto de páginas muestran el avatar del usuario con su menú
+   (email + logout).
 1. **Generate** — form: picker de curso (búsqueda sobre `/api/courses`) *o*
-   topic + reference URL + notas; checkboxes de plataformas; muestra las 3
+   topic + reference URL + notas; chips de plataforma; muestra las 3
    variantes por plataforma en cards A/B/C con acciones rápidas.
-2. **History** — tabla con filtros (plataforma, estado, curso), detalle
-   expandible, acciones del workflow, "duplicate" para reutilizar.
+2. **History** — lista expandible con filtros (plataforma, estado), acciones
+   del workflow, "duplicate" para reutilizar.
 3. **Catalog** — lista de cursos/ofertas, botón "Run sync", panel del run
-   pendiente con resumen del changeset y Approve/Reject.
+   pendiente con el changeset fila a fila y Approve/Reject.
+4. **Settings** — una tarjeta por red: cuenta de destino, caducidad del token,
+   conectar/verificar/desconectar (ver [`PUBLISH-PLAN.md`](PUBLISH-PLAN.md)).
 
 ---
 
