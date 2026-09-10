@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-import NavLinks from "@/components/layout/NavLinks";
-import UserMenu from "@/components/layout/UserMenu";
+import AppHeader from "@/components/layout/AppHeader";
+import PageBackground from "@/components/layout/PageBackground";
 import styles from "./shell.module.css";
 
 // Authenticated app shell: middleware guarantees a session cookie exists for
@@ -9,14 +9,8 @@ import styles from "./shell.module.css";
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className={styles.shell}>
-      <header className={styles.header}>
-        <div className={styles.brand}>
-          <span className={styles.brandMark}>WRCC</span>
-          <span className={styles.brandName}>Social Media Marketing</span>
-        </div>
-        <NavLinks />
-        <UserMenu />
-      </header>
+      <PageBackground />
+      <AppHeader />
       <main className={styles.main}>{children}</main>
     </div>
   );

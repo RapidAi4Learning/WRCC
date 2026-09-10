@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { loginSession } from "@/lib/api";
 import { setCurrentUser } from "@/lib/auth";
 import { errorMessage } from "@/lib/errors";
+import BrandLogo from "@/components/layout/BrandLogo";
+import PageBackground from "@/components/layout/PageBackground";
 import { Button, Callout, Field, TextInput, cardClass } from "@/components/ui";
 import styles from "./login.module.css";
 
@@ -44,7 +46,7 @@ function LoginForm() {
   return (
     <form className={cardClass({ padding: "xl", className: styles.card })} onSubmit={handleSubmit}>
       <div className={styles.intro}>
-        <p className={styles.brand}>WRCC</p>
+        <BrandLogo size="lg" />
         <h1 className={styles.title}>Social Media Marketing</h1>
         <p className={styles.subtitle}>
           Sign in to generate and review social content for Western Riverina
@@ -105,6 +107,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <main className={styles.page}>
+      <PageBackground />
       {/* useSearchParams requires a Suspense boundary during prerender. */}
       <Suspense fallback={null}>
         <LoginForm />

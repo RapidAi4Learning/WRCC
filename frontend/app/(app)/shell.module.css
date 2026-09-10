@@ -4,42 +4,20 @@
   flex-direction: column;
 }
 
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-6);
-  padding: var(--space-3) var(--space-6);
-  background: var(--color-surface-raised);
-  border-bottom: 1px solid var(--color-border);
-  min-height: var(--header-height);
-  position: sticky;
-  top: 0;
-  z-index: var(--z-header);
-}
-
-.brand {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-}
-
-.brandMark {
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: var(--color-accent-strong);
-}
-
-.brandName {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
 .main {
+  /* Above the fixed petal background. */
+  position: relative;
+  z-index: 1;
   flex: 1;
   width: 100%;
   /* Wide workspace: side-by-side compose + results need the horizontal room. */
   max-width: 90rem;
   margin: 0 auto;
   padding: var(--space-8) var(--space-6) var(--space-12);
+}
+
+@media (max-width: 48rem) {
+  .main {
+    padding: var(--space-6) var(--space-4) var(--space-8);
+  }
 }

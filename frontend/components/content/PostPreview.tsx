@@ -15,6 +15,7 @@
 import { useState } from "react";
 
 import { imageFileUrl } from "@/lib/api";
+import { initials } from "@/lib/initials";
 import type { MediaAsset, Platform } from "@/types/content";
 import type { SocialAccount } from "@/types/publishing";
 import styles from "./PostPreview.module.css";
@@ -38,15 +39,6 @@ interface PostPreviewProps {
   text: string;
   images: MediaAsset[];
   account: SocialAccount | null;
-}
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase() ?? "")
-    .join("");
 }
 
 /** Split the text at the fold, on a word boundary so it does not cut mid-word. */

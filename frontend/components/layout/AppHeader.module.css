@@ -1,0 +1,95 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  background: var(--color-surface-raised);
+  border-bottom: 6px solid var(--color-cta);
+  box-shadow: var(--shadow-subtle);
+}
+
+.inner {
+  max-width: 90rem;
+  margin: 0 auto;
+  min-height: calc(var(--header-height) - 6px);
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-3) var(--space-6);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  margin-right: auto;
+  min-width: 0;
+}
+
+.divider {
+  width: 2px;
+  height: 3rem;
+  border-radius: 1px;
+  background: var(--brand-purple-200);
+}
+
+.product {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+.end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Scoped under .header so it outranks IconButton's own `display`, which would
+   otherwise win on stylesheet order and show the toggle on desktop. */
+.header .menuToggle {
+  display: none;
+}
+
+/* The product name gives way first, before the navigation has to. */
+@media (max-width: 72rem) {
+  .divider,
+  .product {
+    display: none;
+  }
+}
+
+@media (max-width: 48rem) {
+  .inner {
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+  }
+
+  .header .menuToggle {
+    display: inline-grid;
+    width: 2.75rem;
+    height: 2.75rem;
+    color: var(--color-accent);
+  }
+
+  /* Folded navigation drops below the lime rule as a full-width panel. */
+  .header .nav {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface-raised);
+    border-bottom: 1px solid var(--color-border);
+    box-shadow: var(--shadow-raised);
+  }
+
+  .header .navOpen {
+    display: flex;
+  }
+}

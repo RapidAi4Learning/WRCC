@@ -1,0 +1,25 @@
+.background {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.purple {
+  fill: var(--brand-purple-100);
+  opacity: 0.75;
+}
+
+.lime {
+  fill: var(--brand-lime-100);
+  opacity: 0.8;
+}
+
+/* On a phone the petals would sit behind the text itself; keep them faint. */
+@media (max-width: 48rem) {
+  .background {
+    opacity: 0.5;
+  }
+}

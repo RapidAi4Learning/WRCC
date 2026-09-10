@@ -1,0 +1,30 @@
+.link {
+  display: inline-flex;
+  flex: none;
+  border-radius: var(--radius-sm);
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+}
+
+/* Height drives the size; width follows the logo's own ratio. */
+.logo {
+  display: block;
+  width: auto;
+}
+
+.md {
+  height: 3.25rem;
+}
+
+.lg {
+  height: 3.6rem;
+}
+
+@media (max-width: 48rem) {
+  .md {
+    height: 2.5rem;
+  }
+}

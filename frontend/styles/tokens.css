@@ -102,3 +102,10 @@
   --duration-fast: 150ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* The header collapses to logo + menu button on narrow screens. */
+@media (max-width: 48rem) {
+  :root {
+    --header-height: 4.25rem;
+  }
+}

@@ -309,6 +309,18 @@ Métrica: CSS de pantallas/componentes **2 885 → 1 470 líneas** (−49 %); co
 las 793 líneas de los 16 primitivos, el total queda en 2 263 (−22 %). Único
 literal de color fuera de `tokens.css`: el chrome de Instagram citado arriba.
 
+**Fase 2 — hecha.** Tokens con los colores oficiales; el lima es el CTA
+(siempre con texto morado 900), el morado es acento/foco/selección. Se añadió
+un tono `success` propio: "approved" y las altas del catálogo se leen en verde
+y "published" sigue siendo el badge más fuerte. Figtree + Outfit por
+`next/font`; `lucide-react` 1.44.0 fijado; marcas de red de Simple Icons.
+
+**Fase 3 — hecha.** `AppHeader` (logo oficial, divisor, nombre del producto,
+nav con píldora lima y `aria-current`, avatar con menú de cuenta, regla lima),
+menú plegable por debajo de 48rem —que corrige el desborde a 375px de la
+baseline—, fondo de pétalos (`PageBackground`) y login con el mismo lenguaje.
+La tagline sigue sin mostrarse: el hueco está marcado en `AppHeader`.
+
 ## 6. Estimación
 
 | Fase | Días |
