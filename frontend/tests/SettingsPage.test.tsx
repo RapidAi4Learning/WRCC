@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import SettingsPage from "@/app/(app)/settings/page";
@@ -237,23 +237,32 @@ describe("Settings — connections", () => {
     await waitFor(() => expect(mockActivate).toHaveBeenCalledWith("b"));
   });
 
-  it("confirms before disconnecting", async () => {
+  it("confirms before disconnecting, and keeping the account sends nothing", async () => {
     mockFetchAccounts.mockResolvedValue([account()]);
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
 
     render(<SettingsPage />);
     fireEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
 
-    expect(confirm).toHaveBeenCalled();
+    const dialog = screen.getByRole("dialog", {
+      name: "Disconnect Western Riverina Community College?",
+    });
+    expect(dialog).toHaveTextContent("Posts already published stay live.");
+    // The safe answer is the one that has focus.
+    expect(within(dialog).getByRole("button", { name: "Keep connected" })).toHaveFocus();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Keep connected" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(mockDisconnect).not.toHaveBeenCalled();
   });
 
   it("disconnects once confirmed", async () => {
     mockFetchAccounts.mockResolvedValue([account()]);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
 
     render(<SettingsPage />);
     fireEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Disconnect" }),
+    );
 
     await waitFor(() => expect(mockDisconnect).toHaveBeenCalledWith("acct-1"));
   });

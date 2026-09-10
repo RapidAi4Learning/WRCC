@@ -20,6 +20,7 @@ import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { useEscapeKey } from "@/hooks/useEscapeKey";
 import { cx } from "@/lib/cx";
 import type { Platform } from "@/types/content";
+import { X } from "@/components/icons";
 import IconButton from "./IconButton";
 import styles from "./Modal.module.css";
 
@@ -75,6 +76,13 @@ export default function Modal({
   const depth = useContext(ModalDepth) + 1;
   const titleId = `${id}-title`;
   const dialogRef = useRef<HTMLDivElement>(null);
+  // Captured on the first render, before anything inside the dialog can take
+  // focus (an autoFocus field commits before effects run).
+  const openerRef = useRef<HTMLElement | null>(null);
+  if (openerRef.current === null && typeof document !== "undefined") {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body) openerRef.current = active;
+  }
 
   useBodyScrollLock();
 
@@ -90,11 +98,12 @@ export default function Modal({
   }, [id, onClose]);
   useEscapeKey(closeIfTopmost);
 
-  // Focus moves into the dialog, and back to whatever opened it on close.
+  // Focus moves into the dialog — unless a field inside already took it with
+  // autoFocus — and back to whatever opened it on close.
   useEffect(() => {
-    const opener =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    dialogRef.current?.focus();
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.contains(document.activeElement)) dialog.focus();
+    const opener = openerRef.current;
     return () => opener?.focus();
   }, []);
 
@@ -145,7 +154,7 @@ export default function Modal({
             {hint ? <p className={styles.hint}>{hint}</p> : null}
           </div>
           <IconButton label="Close" onClick={onClose}>
-            ✕
+            <X size={18} />
           </IconButton>
         </header>
         <ModalDepth.Provider value={depth}>{children}</ModalDepth.Provider>

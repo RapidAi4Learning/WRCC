@@ -1,0 +1,15 @@
+.body {
+  padding: var(--space-5);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--color-text);
+}
+
+.body p {
+  margin: 0;
+}
+
+/* The answer sits bottom-right, the way every platform dialog puts it. */
+.footer {
+  justify-content: flex-end;
+}

@@ -332,6 +332,17 @@ también redirigía `/brand/*` al login, así que el optimizador de imágenes
 recibía HTML en vez del logo (en producción, el login se habría quedado sin
 logo).
 
+**Fase 5 — hecha.** `ConfirmDialog` y `PromptDialog` (sobre `Modal`)
+sustituyen a `window.confirm`/`window.prompt`: desconectar una cuenta pregunta
+en la app con el foco en "Keep connected", y rechazar/regenerar un post pide el
+motivo o la instrucción en un diálogo propio. `Modal` ahora respeta el
+`autoFocus` de su contenido. `VariantCard` pinta en lima el siguiente paso de
+cada estado (Submit / Approve / Preview / Restore) y usa iconos reales;
+MediaPanel cambia los emojis por iconos y la zona de soltar por el lima;
+Settings muestra la marca de cada red; en móvil, History y Catalog dan su
+propia línea al título en vez de cortarlo. Tests: los dos de Settings que
+espiaban `window.confirm` pasan a usar el diálogo; +10 tests nuevos (208).
+
 ## 6. Estimación
 
 | Fase | Días |

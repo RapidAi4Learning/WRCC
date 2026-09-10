@@ -29,6 +29,15 @@ import { errorMessage } from "@/lib/errors";
 import { moveItem, toggleOrdered } from "@/lib/selection";
 import type { MediaAsset } from "@/types/content";
 import {
+  ArrowDown,
+  ArrowUp,
+  ImagePlus,
+  RefreshCw,
+  Sparkles,
+  Upload,
+  X,
+} from "@/components/icons";
+import {
   Badge,
   Button,
   Callout,
@@ -257,8 +266,13 @@ export default function MediaPanel({ itemId, onCountChange }: MediaPanelProps) {
     <>
       <div className={styles.sectionHeader}>
         <SectionLabel>Suggestions</SectionLabel>
-        <Button size="sm" onClick={() => void loadSuggestions()} disabled={isSuggesting}>
-          {isSuggesting ? "Thinking…" : "↻ Regenerate"}
+        <Button
+          size="sm"
+          icon={<RefreshCw size={14} />}
+          onClick={() => void loadSuggestions()}
+          disabled={isSuggesting}
+        >
+          {isSuggesting ? "Thinking…" : "Regenerate"}
         </Button>
       </div>
 
@@ -388,7 +402,7 @@ export default function MediaPanel({ itemId, onCountChange }: MediaPanelProps) {
                 onClick={() => move(index, -1)}
                 disabled={index === 0 || isBusy}
               >
-                ↑
+                <ArrowUp size={14} />
               </IconButton>
               <IconButton
                 variant="outline"
@@ -397,7 +411,7 @@ export default function MediaPanel({ itemId, onCountChange }: MediaPanelProps) {
                 onClick={() => move(index, 1)}
                 disabled={index === selectedAssets.length - 1 || isBusy}
               >
-                ↓
+                <ArrowDown size={14} />
               </IconButton>
               <IconButton
                 variant="outline"
@@ -406,7 +420,7 @@ export default function MediaPanel({ itemId, onCountChange }: MediaPanelProps) {
                 onClick={() => toggle(asset.id)}
                 disabled={isBusy}
               >
-                ✕
+                <X size={14} />
               </IconButton>
             </li>
           ))}
@@ -495,8 +509,13 @@ export default function MediaPanel({ itemId, onCountChange }: MediaPanelProps) {
 
   return (
     <>
-      <Button size="sm" className={styles.toggle} onClick={() => setIsOpen(true)}>
-        🖼 Media
+      <Button
+        size="sm"
+        icon={<ImagePlus size={16} />}
+        className={styles.toggle}
+        onClick={() => setIsOpen(true)}
+      >
+        Media
         {library
           ? ` (${selected.length} selected · ${library.length} available)`
           : ""}
@@ -525,10 +544,12 @@ export default function MediaPanel({ itemId, onCountChange }: MediaPanelProps) {
                   things, and this is where that is answered. */}
               <TabList label="Add images" variant="segmented">
                 <Tab isSelected={tab === "generate"} onClick={() => setTab("generate")}>
-                  ✨ Generate with AI
+                  <Sparkles size={16} aria-hidden="true" />
+                  Generate with AI
                 </Tab>
                 <Tab isSelected={tab === "upload"} onClick={() => setTab("upload")}>
-                  ⬆ Upload files
+                  <Upload size={16} aria-hidden="true" />
+                  Upload files
                 </Tab>
               </TabList>
 

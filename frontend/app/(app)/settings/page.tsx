@@ -20,7 +20,15 @@ import { PLATFORMS, PLATFORM_LABELS } from "@/lib/platforms";
 import type { Platform } from "@/types/content";
 import type { SocialAccount } from "@/types/publishing";
 import { publishingHold } from "@/lib/publishing";
-import { Badge, Button, Callout, EmptyState, PageHeader } from "@/components/ui";
+import { PlatformName } from "@/components/content/Badges";
+import {
+  Badge,
+  Button,
+  Callout,
+  ConfirmDialog,
+  EmptyState,
+  PageHeader,
+} from "@/components/ui";
 import styles from "./settings.module.css";
 
 const EXPIRY_WARNING_DAYS = 7;
@@ -58,6 +66,8 @@ function SettingsContent() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // The account waiting on the "are you sure?" dialog, if any.
+  const [pendingDisconnect, setPendingDisconnect] = useState<SocialAccount | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -92,14 +102,8 @@ function SettingsContent() {
     }
   }
 
-  async function handleDisconnect(account: SocialAccount) {
-    if (
-      !window.confirm(
-        `Disconnect ${account.display_name}? Posts already published stay live.`,
-      )
-    ) {
-      return;
-    }
+  async function confirmDisconnect(account: SocialAccount) {
+    setPendingDisconnect(null);
     setBusy(account.id);
     setError(null);
     try {
@@ -178,11 +182,24 @@ function SettingsContent() {
               onConnect={() => void handleConnect(platform)}
               onActivate={(account) => void handleActivate(account)}
               onVerify={(account) => void handleVerify(account)}
-              onDisconnect={(account) => void handleDisconnect(account)}
+              onDisconnect={setPendingDisconnect}
             />
           ))}
         </div>
       )}
+
+      {pendingDisconnect ? (
+        <ConfirmDialog
+          title={`Disconnect ${pendingDisconnect.display_name}?`}
+          confirmLabel="Disconnect"
+          cancelLabel="Keep connected"
+          tone="danger"
+          onConfirm={() => void confirmDisconnect(pendingDisconnect)}
+          onCancel={() => setPendingDisconnect(null)}
+        >
+          <p>Posts already published stay live.</p>
+        </ConfirmDialog>
+      ) : null}
     </section>
   );
 }
@@ -227,7 +244,9 @@ function PlatformCard({
       data-attention={needsAttention ? "true" : undefined}
     >
       <header className={styles.cardHeader}>
-        <h2 className={styles.cardTitle}>{label}</h2>
+        <h2 className={styles.cardTitle}>
+          <PlatformName platform={platform} size="lg" />
+        </h2>
         <span className={isConnected ? styles.dotOn : styles.dotOff} aria-hidden />
         <span className="sr-only">{isConnected ? "Connected" : "Not connected"}</span>
       </header>

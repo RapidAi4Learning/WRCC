@@ -19,3 +19,17 @@
   color: var(--color-text-muted);
   white-space: nowrap;
 }
+
+/* On a phone the topic gets its own line instead of being cut to a few
+   letters; platform, date and status follow underneath. */
+@media (max-width: 40rem) {
+  .rowTopic {
+    flex-basis: 100%;
+    order: -1;
+    white-space: normal;
+  }
+
+  .rowDate {
+    margin-left: auto;
+  }
+}

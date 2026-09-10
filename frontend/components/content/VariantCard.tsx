@@ -19,15 +19,40 @@ import type { Publication } from "@/types/publishing";
 import { PlatformBadge, StatusBadge } from "@/components/content/Badges";
 import MediaPanel from "@/components/content/MediaPanel";
 import PublishDialog from "@/components/content/PublishDialog";
-import { Button, Callout, TextArea, cardClass } from "@/components/ui";
+import { Check, Copy } from "@/components/icons";
+import { Button, Callout, PromptDialog, TextArea, cardClass } from "@/components/ui";
 import styles from "./VariantCard.module.css";
 
 const COPIED_FEEDBACK_MS = 2000;
+const ICON_SIZE = 14;
 
 const STYLE_LABELS: Record<string, string> = {
   direct: "A · Direct",
   story_led: "B · Story-led",
   question_led: "C · Question-led",
+};
+
+// The two actions that take a short piece of text before running.
+type Prompted = "reject" | "regenerate";
+
+const PROMPTS: Record<
+  Prompted,
+  { title: string; label: string; placeholder: string; confirmLabel: string; field: "reason" | "instruction" }
+> = {
+  reject: {
+    title: "Reject this post?",
+    label: "Reason",
+    placeholder: "e.g. The course date is wrong",
+    confirmLabel: "Reject post",
+    field: "reason",
+  },
+  regenerate: {
+    title: "Regenerate this post",
+    label: "Instruction",
+    placeholder: "e.g. Shorter, and mention the Leeton date",
+    confirmLabel: "Regenerate post",
+    field: "instruction",
+  },
 };
 
 interface VariantCardProps {
@@ -37,6 +62,16 @@ interface VariantCardProps {
     action: WorkflowAction | "edit" | "publish",
   ) => void;
   showPlatform?: boolean;
+}
+
+interface CardAction {
+  label: string;
+  onClick: () => void;
+  show: boolean;
+  /** The one next step for this status: drawn as the lime call to action. */
+  isPrimary?: boolean;
+  disabled?: boolean;
+  title?: string;
 }
 
 export default function VariantCard({
@@ -50,6 +85,7 @@ export default function VariantCard({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [hasCopied, setHasCopied] = useState(false);
   const [isPublishOpen, setIsPublishOpen] = useState(false);
+  const [prompted, setPrompted] = useState<Prompted | null>(null);
   const [permalink, setPermalink] = useState<string | null>(null);
 
   const isPublished = item.status === "published";
@@ -127,15 +163,10 @@ export default function VariantCard({
     }
   }
 
-  function handleReject() {
-    const reason = window.prompt("Reason for rejection (optional):") ?? undefined;
-    void runAction("reject", reason ? { reason } : undefined);
-  }
-
-  function handleRegenerate() {
-    const instruction =
-      window.prompt("Instruction for the regeneration (optional):") ?? undefined;
-    void runAction("regenerate", instruction ? { instruction } : undefined);
+  function submitPrompt(kind: Prompted, value: string) {
+    setPrompted(null);
+    // Blank means "no reason given", not an empty reason.
+    void runAction(kind, value ? { [PROMPTS[kind].field]: value } : undefined);
   }
 
   async function handlePublished(publication: Publication) {
@@ -149,26 +180,22 @@ export default function VariantCard({
     }
   }
 
-  const actions: Array<{
-    label: string;
-    onClick: () => void;
-    show: boolean;
-    disabled?: boolean;
-    title?: string;
-  }> = [
+  const actions: CardAction[] = [
     {
       label: "Submit for approval",
       onClick: () => void runAction("submit"),
       show: item.status === "draft",
+      isPrimary: true,
     },
     {
       label: "Approve",
       onClick: () => void runAction("approve"),
       show: item.status === "pending_approval",
+      isPrimary: true,
     },
     {
       label: "Reject",
-      onClick: handleReject,
+      onClick: () => setPrompted("reject"),
       show: item.status === "pending_approval",
     },
     {
@@ -177,6 +204,7 @@ export default function VariantCard({
       label: "Preview",
       onClick: () => setIsPublishOpen(true),
       show: item.status === "approved",
+      isPrimary: true,
       // Disabled rather than hidden: a missing button reads as a bug, and the
       // reason is worth telling the person who was about to click it.
       disabled: hold !== null,
@@ -204,7 +232,7 @@ export default function VariantCard({
     },
     {
       label: "Regenerate",
-      onClick: handleRegenerate,
+      onClick: () => setPrompted("regenerate"),
       show: item.status !== "archived" && !isPublished,
     },
     {
@@ -216,6 +244,7 @@ export default function VariantCard({
       label: "Restore",
       onClick: () => void runAction("restore"),
       show: item.status === "archived",
+      isPrimary: true,
     },
   ];
 
@@ -246,6 +275,7 @@ export default function VariantCard({
         <Button
           size="sm"
           variant={hasCopied ? "primary" : "secondary"}
+          icon={hasCopied ? <Check size={ICON_SIZE} /> : <Copy size={ICON_SIZE} />}
           onClick={() => void handleCopy()}
         >
           {hasCopied ? "Copied" : "Copy"}
@@ -299,6 +329,7 @@ export default function VariantCard({
             <Button
               key={action.label}
               size="sm"
+              variant={action.isPrimary ? "primary" : "secondary"}
               onClick={action.onClick}
               disabled={busyAction !== null || action.disabled === true}
               title={action.title}
@@ -315,6 +346,18 @@ export default function VariantCard({
         <Callout tone="warn" size="sm">
           {hold}
         </Callout>
+      ) : null}
+
+      {prompted ? (
+        <PromptDialog
+          title={PROMPTS[prompted].title}
+          label={PROMPTS[prompted].label}
+          placeholder={PROMPTS[prompted].placeholder}
+          confirmLabel={PROMPTS[prompted].confirmLabel}
+          tone={prompted === "reject" ? "danger" : "primary"}
+          onSubmit={(value) => submitPrompt(prompted, value)}
+          onCancel={() => setPrompted(null)}
+        />
       ) : null}
 
       {isPublishOpen && !hold ? (

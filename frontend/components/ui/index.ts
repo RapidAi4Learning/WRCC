@@ -8,6 +8,7 @@ export type { ButtonSize, ButtonVariant } from "./Button";
 export { default as Callout } from "./Callout";
 export type { CalloutTone } from "./Callout";
 export { cardClass } from "./Card";
+export { ConfirmDialog, PromptDialog } from "./ConfirmDialog";
 export { DisclosureList, DisclosureRow } from "./DisclosureList";
 export { default as EmptyState } from "./EmptyState";
 export { default as Field } from "./Field";

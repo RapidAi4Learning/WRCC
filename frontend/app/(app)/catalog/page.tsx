@@ -16,6 +16,7 @@ import {
 import { errorMessage } from "@/lib/errors";
 import type { Course, CourseDetail, SyncRun } from "@/types/course";
 import SyncReviewPanel from "@/components/catalog/SyncReviewPanel";
+import { RefreshCw, Search } from "@/components/icons";
 import {
   Badge,
   Button,
@@ -110,6 +111,7 @@ export default function CatalogPage() {
         actions={
           <Button
             variant="primary"
+            icon={<RefreshCw size={16} />}
             onClick={() => void withBusy(startSync)}
             disabled={isBusy || hasRunningRun || pendingRun !== null}
           >
@@ -151,6 +153,7 @@ export default function CatalogPage() {
         <TextInput
           type="search"
           controlSize="sm"
+          icon={<Search size={18} />}
           className={styles.search}
           placeholder="Search title or code…"
           value={search}

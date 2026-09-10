@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import VariantCard from "@/components/content/VariantCard";
+import { contentAction } from "@/lib/api";
 import type { ContentItem } from "@/types/content";
 import type { Publication } from "@/types/publishing";
 
@@ -111,6 +112,53 @@ describe("VariantCard", () => {
     expect(screen.queryByText("Facebook")).not.toBeInTheDocument();
     rerender(<VariantCard item={item()} onChange={vi.fn()} showPlatform />);
     expect(screen.getByText("Facebook")).toBeInTheDocument();
+  });
+});
+
+describe("VariantCard prompted actions", () => {
+  beforeEach(() => {
+    vi.mocked(contentAction).mockResolvedValue(item({ status: "rejected" }));
+  });
+
+  it("asks for a rejection reason in the app and sends it with the action", async () => {
+    const onChange = vi.fn();
+    render(<VariantCard item={item({ status: "pending_approval" })} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    const dialog = screen.getByRole("dialog", { name: "Reject this post?" });
+    fireEvent.change(within(dialog).getByLabelText(/Reason/), {
+      target: { value: "Wrong course date." },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Reject post" }));
+
+    await waitFor(() =>
+      expect(contentAction).toHaveBeenCalledWith("item-1", "reject", {
+        reason: "Wrong course date.",
+      }),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(expect.anything(), "reject"));
+  });
+
+  it("regenerates without an instruction when the field is left blank", async () => {
+    render(<VariantCard item={item()} onChange={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate" }));
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate post" }));
+
+    await waitFor(() =>
+      expect(contentAction).toHaveBeenCalledWith("item-1", "regenerate", undefined),
+    );
+  });
+
+  it("sends nothing when the prompt is cancelled", () => {
+    render(<VariantCard item={item({ status: "pending_approval" })} onChange={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(contentAction).not.toHaveBeenCalled();
   });
 });
 
