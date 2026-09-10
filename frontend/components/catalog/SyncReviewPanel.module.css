@@ -14,7 +14,7 @@
   position: absolute;
   inset: 0 0 auto;
   height: 3px;
-  background: linear-gradient(90deg, var(--color-warn) 0%, var(--color-accent) 100%);
+  background: linear-gradient(90deg, var(--color-accent) 0%, var(--color-cta) 100%);
 }
 
 /* ── Header ── */
@@ -82,12 +82,12 @@
 }
 
 .tally[data-tone="add"] {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
 }
 
 .tally[data-tone="add"] .tallyCount {
-  color: var(--color-accent-strong);
+  color: var(--color-success);
 }
 
 .tally[data-tone="update"] {
@@ -299,8 +299,8 @@
 .now {
   text-decoration: none;
   font-weight: 600;
-  color: var(--color-accent-strong);
-  background: var(--color-accent-soft);
+  color: var(--color-success);
+  background: var(--color-success-soft);
   border-radius: var(--radius-sm);
   padding: 0 var(--space-1);
   overflow-wrap: anywhere;

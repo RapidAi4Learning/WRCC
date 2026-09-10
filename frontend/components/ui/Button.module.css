@@ -58,18 +58,25 @@
 
 /* ── Variants ── */
 
+/* The brand's lime is the one call to action on a screen; its text is the
+   deep purple because white on lime fails contrast. */
 .primary {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  background: var(--color-cta);
+  color: var(--color-on-cta);
+  font-weight: 700;
 }
 
 .primary:hover:not(:disabled) {
-  background: var(--color-accent-strong);
+  background: var(--color-cta-strong);
+}
+
+.primary:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .secondary {
   border-color: var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   color: var(--color-text);
 }
 

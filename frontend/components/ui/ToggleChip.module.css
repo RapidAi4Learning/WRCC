@@ -22,13 +22,18 @@
   pointer-events: none;
 }
 
+.chip {
+  background: var(--color-surface-raised);
+}
+
 .chip:hover {
-  border-color: var(--color-accent);
+  border-color: var(--color-cta);
 }
 
 .chip:has(.input:checked) {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
+  border-color: var(--color-cta);
+  background: var(--color-cta-soft);
+  box-shadow: inset 0 0 0 1px var(--color-cta);
 }
 
 .chip:has(.input:focus-visible) {

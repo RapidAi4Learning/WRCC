@@ -52,7 +52,12 @@
   background: var(--color-accent-soft);
 }
 
-/* Deliberately louder than .accent: "ready to go" and "already gone" being
+.success {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+/* Deliberately louder than .success: "ready to go" and "already gone" being
    confusable is what causes a post to be published twice. */
 .solid {
   color: var(--color-on-accent);

@@ -24,7 +24,11 @@ export default function SectionLabel({
 }: SectionLabelProps) {
   return (
     <Element className={cx(styles.label, styles[size], styles[tone], className)} {...rest}>
-      {step !== undefined ? <span className={styles.step}>{step} · </span> : null}
+      {step !== undefined ? (
+        <span className={styles.step}>
+          <span className={styles.stepNumber}>{step}</span> ·{" "}
+        </span>
+      ) : null}
       {children}
     </Element>
   );

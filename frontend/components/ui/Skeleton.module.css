@@ -1,7 +1,7 @@
 .skeleton {
   border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  border: 1px dashed var(--color-border);
+  background: var(--color-surface-sunken);
+  border: 1px dashed var(--color-border-strong);
   animation: pulse 1.4s ease-in-out infinite;
 }
 

@@ -40,9 +40,9 @@
 }
 
 .success {
-  color: var(--color-accent-strong);
-  background: var(--color-accent-soft);
-  --callout-rule: var(--color-accent);
+  color: var(--color-success);
+  background: var(--color-success-soft);
+  --callout-rule: var(--color-success);
 }
 
 .neutral {

@@ -67,7 +67,10 @@
 
 .title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-accent-strong);
 }
 
 .hint {

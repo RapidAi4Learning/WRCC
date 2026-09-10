@@ -57,7 +57,7 @@ const INITIAL_VISIBLE = 12;
 // Tone is carried by colour (accent = added, warn = changed, danger = removed)
 // rather than by icons, so the tallies and the sections agree at a glance.
 const COUNT_TONES: Record<string, BadgeTone> = {
-  add: "accent",
+  add: "success",
   update: "warn",
   remove: "danger",
 };

@@ -7,6 +7,7 @@ export type BadgeTone =
   | "neutral"
   | "outline"
   | "accent"
+  | "success"
   | "solid"
   | "warn"
   | "danger"

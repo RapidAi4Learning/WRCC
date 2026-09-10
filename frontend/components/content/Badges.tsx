@@ -1,11 +1,12 @@
 import { PLATFORM_LABELS, STATUS_LABELS } from "@/lib/platforms";
 import type { ContentStatus, Platform } from "@/types/content";
+import { PlatformIcon } from "@/components/icons";
 import { Badge, type BadgeTone } from "@/components/ui";
 
 const STATUS_TONES: Record<ContentStatus, BadgeTone> = {
   draft: "neutral",
   pending_approval: "warn",
-  approved: "accent",
+  approved: "success",
   rejected: "danger",
   // Deliberately louder than approved: "ready to go" and "already gone" being
   // confusable is what causes a post to be published twice.
@@ -14,7 +15,12 @@ const STATUS_TONES: Record<ContentStatus, BadgeTone> = {
 };
 
 export function PlatformBadge({ platform }: { platform: Platform }) {
-  return <Badge tone={platform}>{PLATFORM_LABELS[platform]}</Badge>;
+  return (
+    <Badge tone={platform}>
+      <PlatformIcon platform={platform} size={12} tone="mono" />
+      {PLATFORM_LABELS[platform]}
+    </Badge>
+  );
 }
 
 export function StatusBadge({ status }: { status: ContentStatus }) {

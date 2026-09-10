@@ -3,40 +3,74 @@
    primitives in components/ui, not every screen. */
 
 :root {
-  /* Palette: warm paper surface, deep green ink, wheat accent. */
-  --color-surface: #faf8f4;
+  /* Brand ramps. The three anchors are the college's own colours, taken from
+     wrcc.nsw.edu.au (#582281, #781D7D, #aebd37); the other steps derive from
+     them. */
+  --brand-purple-900: #3a1656;
+  --brand-purple-700: #582281;
+  --brand-magenta-700: #781d7d;
+  --brand-purple-500: #8a62ad;
+  --brand-purple-200: #dccbea;
+  --brand-purple-100: #efe7f5;
+  --brand-lavender-50: #f8f5fb;
+  --brand-lime-500: #aebd37;
+  --brand-lime-600: #9aa92c;
+  --brand-lime-700: #7a871c; /* lime as large text: ≥ 3:1 on white */
+  --brand-lime-800: #5c6614; /* lime as small text: ≥ 4.5:1 on white */
+  --brand-lime-100: #f2f5dc;
+
+  /* Surfaces and ink. */
+  --color-surface: var(--brand-lavender-50);
   --color-surface-raised: #ffffff;
-  --color-surface-sunken: #f1ede5;
-  --color-border: #e2dcd0;
-  --color-text: #1f2a24;
-  --color-text-muted: #6b7268;
-  --color-accent: #1e5c3f;
-  --color-accent-strong: #14432e;
-  --color-accent-soft: #e3efe8;
+  --color-surface-sunken: #f2edf7;
+  --color-field: #fcfbfd;
+  --color-border: #e3d8ec;
+  --color-border-strong: #cfbadf;
+  --color-text: #2a2233;
+  --color-text-muted: #6a6275;
+  --color-placeholder: #9a92a6;
+
+  /* Accent = brand purple: links, focus, selection, emphasis. */
+  --color-accent: var(--brand-purple-700);
+  --color-accent-strong: var(--brand-purple-900);
+  --color-accent-soft: var(--brand-purple-100);
   --color-on-accent: #ffffff;
-  --color-warn: #a05716;
-  --color-warn-soft: #f7e9da;
-  --color-danger: #a02c2c;
-  --color-danger-soft: #f7e0e0;
+
+  /* Call to action = brand lime. Text on it is always purple 900 — white on
+     #aebd37 fails contrast. */
+  --color-cta: var(--brand-lime-500);
+  --color-cta-strong: var(--brand-lime-600);
+  --color-cta-soft: var(--brand-lime-100);
+  --color-on-cta: var(--brand-purple-900);
+  --color-cta-text: var(--brand-lime-700);
+
+  /* Semantics. */
+  --color-success: #4d6a0f;
+  --color-success-soft: #eef4d6;
+  --color-warn: #9a5800;
+  --color-warn-soft: #fbf0dc;
+  --color-danger: #b42335;
+  --color-danger-soft: #fbe5e8;
 
   /* Scrims behind dialogs and over images. */
-  --color-overlay: rgb(20 28 24 / 0.45);
-  --color-scrim: rgb(20 28 24 / 0.55);
+  --color-overlay: rgb(42 18 60 / 0.45);
+  --color-scrim: rgb(30 14 44 / 0.55);
 
   /* Platform identities (used semantically on badges/cards). */
   --color-facebook: #1877f2;
   --color-instagram: #c13584;
   --color-linkedin: #0a66c2;
 
-  /* Type scale. */
-  --font-sans: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-display: var(--font-sans);
+  /* Type. Figtree for text, Outfit for display — both self-hosted by
+     next/font, which defines the two variables on <html>. */
+  --font-sans: var(--font-figtree, system-ui), "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-outfit, var(--font-sans)), var(--font-sans);
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
-  --text-lg: 1.2rem;
-  --text-xl: 1.5rem;
-  --text-display: clamp(1.75rem, 1.4rem + 1.4vw, 2.4rem);
+  --text-lg: 1.25rem;
+  --text-xl: 1.6rem;
+  --text-display: clamp(2rem, 1.4rem + 2.2vw, 3rem);
 
   /* Rhythm. */
   --space-1: 0.25rem;
@@ -48,18 +82,20 @@
   --space-8: 2rem;
   --space-12: 3rem;
 
-  --radius-sm: 6px;
+  --radius-sm: 8px;
   --radius-md: 10px;
-  --radius-lg: 16px;
+  --radius-lg: 14px;
   --radius-pill: 999px;
 
-  --shadow-subtle: 0 1px 2px rgb(0 0 0 / 0.06);
-  --shadow-raised: 0 1px 2px rgb(31 42 36 / 0.06), 0 4px 16px rgb(31 42 36 / 0.06);
-  --shadow-float: 0 1px 3px rgb(0 0 0 / 0.3);
-  --shadow-modal: 0 24px 64px rgb(0 0 0 / 0.28);
+  /* Elevation, tinted with the brand purple rather than neutral grey. */
+  --shadow-subtle: 0 1px 2px rgb(58 22 86 / 0.06);
+  --shadow-raised: 0 1px 2px rgb(58 22 86 / 0.05), 0 8px 24px rgb(58 22 86 / 0.07);
+  --shadow-float: 0 1px 3px rgb(30 14 44 / 0.3);
+  --shadow-modal: 0 28px 72px rgb(30 14 44 / 0.3);
+  --shadow-focus: 0 0 0 3px rgb(88 34 129 / 0.18);
 
   /* Layout. */
-  --header-height: 3.75rem;
+  --header-height: 5.5rem;
   --z-header: 10;
   --z-modal: 50;
 
