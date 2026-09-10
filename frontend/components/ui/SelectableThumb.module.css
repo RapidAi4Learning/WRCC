@@ -1,0 +1,63 @@
+.thumb {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  line-height: 0;
+}
+
+.thumb:disabled {
+  cursor: default;
+}
+
+.thumb:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.image {
+  display: block;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Tile: the card around it shows the selection ── */
+
+.tile .image {
+  width: 100%;
+  height: auto;
+}
+
+/* ── Compact: the selected image is the one that ships, so it must be
+   unmistakable — not a one-pixel difference from the others. ── */
+
+.compact {
+  overflow: hidden;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  opacity: 0.75;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out);
+}
+
+.compact:hover {
+  border-color: var(--color-text-muted);
+  opacity: 1;
+}
+
+.compact[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+  opacity: 1;
+}
+
+.compact .image {
+  width: 5rem;
+  height: 5rem;
+  object-fit: cover;
+  border-radius: 0;
+}

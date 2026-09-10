@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { PlatformBadge, StatusBadge } from "@/components/Badges";
+import { PlatformBadge, StatusBadge } from "@/components/content/Badges";
 
 describe("badges", () => {
   it("labels every platform", () => {

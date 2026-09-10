@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-import NavLinks from "@/components/NavLinks";
-import UserMenu from "@/components/UserMenu";
+import NavLinks from "@/components/layout/NavLinks";
+import UserMenu from "@/components/layout/UserMenu";
 import styles from "./shell.module.css";
 
 // Authenticated app shell: middleware guarantees a session cookie exists for

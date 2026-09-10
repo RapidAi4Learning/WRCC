@@ -3,8 +3,10 @@
 import { FormEvent, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { ApiError, loginSession } from "@/lib/api";
+import { loginSession } from "@/lib/api";
 import { setCurrentUser } from "@/lib/auth";
+import { errorMessage } from "@/lib/errors";
+import { Button, Callout, Field, TextInput, cardClass } from "@/components/ui";
 import styles from "./login.module.css";
 
 function LoginForm() {
@@ -34,70 +36,68 @@ function LoginForm() {
       router.push(destination);
       router.refresh();
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Unable to log in. Please try again.",
-      );
+      setError(errorMessage(err, "Unable to log in. Please try again."));
       setIsSubmitting(false);
     }
   }
 
   return (
-    <form className={styles.card} onSubmit={handleSubmit}>
-      <p className={styles.brand}>WRCC</p>
-      <h1 className={styles.title}>Social Media Marketing</h1>
-      <p className={styles.subtitle}>
-        Sign in to generate and review social content for Western Riverina
-        Community College.
-      </p>
+    <form className={cardClass({ padding: "xl", className: styles.card })} onSubmit={handleSubmit}>
+      <div className={styles.intro}>
+        <p className={styles.brand}>WRCC</p>
+        <h1 className={styles.title}>Social Media Marketing</h1>
+        <p className={styles.subtitle}>
+          Sign in to generate and review social content for Western Riverina
+          Community College.
+        </p>
+      </div>
 
-      <label className={styles.label} htmlFor="email">
-        Email
-      </label>
-      <input
-        id="email"
-        type="email"
-        autoComplete="email"
-        required
-        className={styles.input}
-        value={email}
-        onChange={(event) => setEmail(event.target.value)}
-      />
+      <Field label="Email" htmlFor="email">
+        <TextInput
+          id="email"
+          type="email"
+          autoComplete="email"
+          required
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+        />
+      </Field>
 
-      <label className={styles.label} htmlFor="password">
-        Password
-      </label>
-      <div className={styles.passwordField}>
-        <input
+      {/* The reveal control sits inside the field rather than beside it, so the
+          form keeps its single column and the label still names the input. */}
+      <Field label="Password" htmlFor="password">
+        <TextInput
           id="password"
           type={isPasswordVisible ? "text" : "password"}
           autoComplete="current-password"
           required
-          className={`${styles.input} ${styles.passwordInput}`}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
+          trailing={
+            <Button
+              variant="ghost"
+              size="sm"
+              className={styles.reveal}
+              onClick={() => setIsPasswordVisible((visible) => !visible)}
+              aria-pressed={isPasswordVisible}
+              aria-label={isPasswordVisible ? "Hide password" : "Show password"}
+              aria-controls="password"
+            >
+              {isPasswordVisible ? "Hide" : "Show"}
+            </Button>
+          }
         />
-        <button
-          // Inside a form, so it has to say it is not the submit button.
-          type="button"
-          className={styles.reveal}
-          onClick={() => setIsPasswordVisible((visible) => !visible)}
-          aria-pressed={isPasswordVisible}
-          aria-label={isPasswordVisible ? "Hide password" : "Show password"}
-          aria-controls="password"
-        >
-          {isPasswordVisible ? "Hide" : "Show"}
-        </button>
-      </div>
+      </Field>
 
       {error ? (
-        <p role="alert" className={styles.error}>
+        <Callout tone="danger" role="alert">
           {error}
-        </p>
+        </Callout>
       ) : null}
 
-      <button type="submit" className={styles.submit} disabled={isSubmitting}>
+      <Button type="submit" variant="primary" size="lg" block disabled={isSubmitting}>
         {isSubmitting ? "Signing in…" : "Sign in"}
-      </button>
+      </Button>
     </form>
   );
 }

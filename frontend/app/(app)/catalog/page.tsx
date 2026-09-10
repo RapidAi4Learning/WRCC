@@ -6,7 +6,6 @@
 import { useCallback, useEffect, useState } from "react";
 
 import {
-  ApiError,
   approveSyncRun,
   fetchCourse,
   fetchCourses,
@@ -14,8 +13,19 @@ import {
   rejectSyncRun,
   startSync,
 } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
 import type { Course, CourseDetail, SyncRun } from "@/types/course";
-import SyncReviewPanel from "@/components/SyncReviewPanel";
+import SyncReviewPanel from "@/components/catalog/SyncReviewPanel";
+import {
+  Badge,
+  Button,
+  Callout,
+  DisclosureList,
+  DisclosureRow,
+  EmptyState,
+  PageHeader,
+  TextInput,
+} from "@/components/ui";
 import styles from "./catalog.module.css";
 
 const RUNNING_POLL_MS = 2000;
@@ -48,7 +58,7 @@ export default function CatalogPage() {
       }));
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load catalog.");
+      setError(errorMessage(err, "Could not load catalog."));
     }
   }, [search]);
 
@@ -74,7 +84,7 @@ export default function CatalogPage() {
       await work();
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Action failed.");
+      setError(errorMessage(err, "Action failed."));
     } finally {
       setIsBusy(false);
     }
@@ -94,35 +104,31 @@ export default function CatalogPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Course catalog</h1>
-          <p className={styles.lede}>
-            Scraped from wrcc.nsw.edu.au — changes only go live after your
-            approval.
-          </p>
-        </div>
-        <button
-          type="button"
-          className={styles.syncButton}
-          onClick={() => void withBusy(startSync)}
-          disabled={isBusy || hasRunningRun || pendingRun !== null}
-        >
-          {hasRunningRun ? "Sync running…" : "Run sync"}
-        </button>
-      </header>
+      <PageHeader
+        title="Course catalog"
+        lede="Scraped from wrcc.nsw.edu.au — changes only go live after your approval."
+        actions={
+          <Button
+            variant="primary"
+            onClick={() => void withBusy(startSync)}
+            disabled={isBusy || hasRunningRun || pendingRun !== null}
+          >
+            {hasRunningRun ? "Sync running…" : "Run sync"}
+          </Button>
+        }
+      />
 
       {error ? (
-        <p role="alert" className={styles.error}>
+        <Callout tone="danger" role="alert">
           {error}
-        </p>
+        </Callout>
       ) : null}
 
       {hasRunningRun ? (
-        <p className={styles.runningNote}>
+        <Callout tone="neutral">
           Crawling every category and course page. Nothing changes until the
           result comes back here for review.
-        </p>
+        </Callout>
       ) : null}
 
       {pendingRun ? (
@@ -138,12 +144,13 @@ export default function CatalogPage() {
           }
         />
       ) : latestRun && latestRun.status === "failed" ? (
-        <p className={styles.error}>Last sync failed: {latestRun.error}</p>
+        <Callout tone="danger">Last sync failed: {latestRun.error}</Callout>
       ) : null}
 
       <div className={styles.toolbar}>
-        <input
+        <TextInput
           type="search"
+          controlSize="sm"
           className={styles.search}
           placeholder="Search title or code…"
           value={search}
@@ -154,71 +161,65 @@ export default function CatalogPage() {
       </div>
 
       {courses.length === 0 ? (
-        <p className={styles.empty}>
-          No courses yet — run a sync and approve the changeset.
-        </p>
+        <EmptyState>No courses yet — run a sync and approve the changeset.</EmptyState>
       ) : (
-        <ul className={styles.list}>
+        <DisclosureList>
           {courses.map((course) => (
-            <li key={course.id} className={styles.row}>
-              <button
-                type="button"
-                className={styles.rowButton}
-                onClick={() => void toggleCourse(course)}
-                aria-expanded={expanded?.id === course.id}
-              >
-                <span className={styles.code}>{course.course_code}</span>
-                <span className={styles.rowTitle}>{course.title}</span>
-                {course.category ? (
-                  <span className={styles.category}>{course.category}</span>
-                ) : null}
-                {course.is_accredited ? (
-                  <span className={styles.accredited}>Accredited</span>
-                ) : null}
-              </button>
-              {expanded?.id === course.id ? (
-                <div className={styles.offerings}>
-                  {expanded.offerings.length === 0 ? (
-                    <p className={styles.empty}>No scheduled offerings.</p>
-                  ) : (
-                    <table className={styles.table}>
-                      <thead>
-                        <tr>
-                          <th>Date</th>
-                          <th>Time</th>
-                          <th>Location</th>
-                          <th>Spaces</th>
-                          <th>Cost</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {expanded.offerings.map((offering) => (
-                          <tr key={offering.id}>
-                            <td>
-                              {offering.start_date ?? "On demand"}
-                              {offering.finish_date &&
-                              offering.finish_date !== offering.start_date
-                                ? ` → ${offering.finish_date}`
-                                : ""}
-                            </td>
-                            <td>{offering.time_text ?? "—"}</td>
-                            <td>{offering.location ?? "—"}</td>
-                            <td>{offering.places_available ?? "—"}</td>
-                            <td>
-                              {offering.price !== null
-                                ? `$${offering.price.toFixed(2)}`
-                                : "—"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              ) : null}
-            </li>
+            <DisclosureRow
+              key={course.id}
+              isExpanded={expanded?.id === course.id}
+              onToggle={() => void toggleCourse(course)}
+              bodyVariant="flush"
+              summary={
+                <>
+                  <span className={styles.code}>{course.course_code}</span>
+                  <span className={styles.rowTitle}>{course.title}</span>
+                  {course.category ? (
+                    <span className={styles.category}>{course.category}</span>
+                  ) : null}
+                  {course.is_accredited ? <Badge tone="accent">Accredited</Badge> : null}
+                </>
+              }
+            >
+              {expanded && expanded.offerings.length === 0 ? (
+                <EmptyState size="sm">No scheduled offerings.</EmptyState>
+              ) : (
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Time</th>
+                      <th>Location</th>
+                      <th>Spaces</th>
+                      <th>Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {expanded?.offerings.map((offering) => (
+                      <tr key={offering.id}>
+                        <td>
+                          {offering.start_date ?? "On demand"}
+                          {offering.finish_date &&
+                          offering.finish_date !== offering.start_date
+                            ? ` → ${offering.finish_date}`
+                            : ""}
+                        </td>
+                        <td>{offering.time_text ?? "—"}</td>
+                        <td>{offering.location ?? "—"}</td>
+                        <td>{offering.places_available ?? "—"}</td>
+                        <td>
+                          {offering.price !== null
+                            ? `$${offering.price.toFixed(2)}`
+                            : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </DisclosureRow>
           ))}
-        </ul>
+        </DisclosureList>
       )}
     </div>
   );

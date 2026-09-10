@@ -9,38 +9,28 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import {
-  ApiError,
   activateSocialAccount,
   disconnectSocialAccount,
   fetchAuthorizeUrl,
   fetchSocialAccounts,
   verifySocialAccount,
 } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
+import { PLATFORMS, PLATFORM_LABELS } from "@/lib/platforms";
 import type { Platform } from "@/types/content";
 import type { SocialAccount } from "@/types/publishing";
 import { publishingHold } from "@/lib/publishing";
+import { Badge, Button, Callout, EmptyState, PageHeader } from "@/components/ui";
 import styles from "./settings.module.css";
 
 const EXPIRY_WARNING_DAYS = 7;
 
-const PLATFORMS: Array<{ platform: Platform; label: string; blurb: string }> = [
-  {
-    platform: "facebook",
-    label: "Facebook",
-    blurb: "Publishes to a Page you administer. Text posts, with or without an image.",
-  },
-  {
-    platform: "instagram",
-    label: "Instagram",
-    blurb:
-      "Needs a Business account linked to the Facebook Page. Every post requires an image.",
-  },
-  {
-    platform: "linkedin",
-    label: "LinkedIn",
-    blurb: "Publishes to the Company Page you administer.",
-  },
-];
+const PLATFORM_BLURBS: Record<Platform, string> = {
+  facebook: "Publishes to a Page you administer. Text posts, with or without an image.",
+  instagram:
+    "Needs a Business account linked to the Facebook Page. Every post requires an image.",
+  linkedin: "Publishes to the Company Page you administer.",
+};
 
 type Expiry =
   | { kind: "none" }
@@ -60,10 +50,6 @@ function describeExpiry(account: SocialAccount): Expiry {
   if (account.token_expired) return { kind: "expired" };
   const days = Math.ceil((expiresAt.getTime() - Date.now()) / 86_400_000);
   return days <= EXPIRY_WARNING_DAYS ? { kind: "soon", days, date } : { kind: "ok", date };
-}
-
-function errorMessage(err: unknown, fallback: string): string {
-  return err instanceof ApiError ? err.message : fallback;
 }
 
 function SettingsContent() {
@@ -160,50 +146,41 @@ function SettingsContent() {
 
   return (
     <section className={styles.page} aria-labelledby="settings-heading">
-      <header className={styles.header}>
-        <div>
-          <h1 id="settings-heading" className={styles.title}>
-            Connections
-          </h1>
-          <p className={styles.lede}>
-            Approved posts publish to whichever account is set as the
-            destination for its network.
-          </p>
-        </div>
-      </header>
+      <PageHeader
+        title="Connections"
+        titleId="settings-heading"
+        lede="Approved posts publish to whichever account is set as the destination for its network."
+      />
 
       {notice ? (
-        <p role="status" className={styles.notice}>
+        <Callout tone="success" role="status">
           {notice}
-        </p>
+        </Callout>
       ) : null}
       {error ? (
-        <p role="alert" className={styles.error}>
+        <Callout tone="danger" role="alert">
           {error}
-        </p>
+        </Callout>
       ) : null}
 
       {accounts === null ? (
-        <p className={styles.loading}>Loading connections…</p>
+        <EmptyState>Loading connections…</EmptyState>
       ) : (
         <div className={styles.cards}>
-          {PLATFORMS.map(({ platform, label, blurb }) => {
-            const forPlatform = accounts.filter((a) => a.platform === platform);
-            return (
-              <PlatformCard
-                key={platform}
-                platform={platform}
-                label={label}
-                blurb={blurb}
-                accounts={forPlatform}
-                busy={busy}
-                onConnect={() => void handleConnect(platform)}
-                onActivate={(account) => void handleActivate(account)}
-                onVerify={(account) => void handleVerify(account)}
-                onDisconnect={(account) => void handleDisconnect(account)}
-              />
-            );
-          })}
+          {PLATFORMS.map((platform) => (
+            <PlatformCard
+              key={platform}
+              platform={platform}
+              label={PLATFORM_LABELS[platform]}
+              blurb={PLATFORM_BLURBS[platform]}
+              accounts={accounts.filter((a) => a.platform === platform)}
+              busy={busy}
+              onConnect={() => void handleConnect(platform)}
+              onActivate={(account) => void handleActivate(account)}
+              onVerify={(account) => void handleVerify(account)}
+              onDisconnect={(account) => void handleDisconnect(account)}
+            />
+          ))}
         </div>
       )}
     </section>
@@ -252,9 +229,7 @@ function PlatformCard({
       <header className={styles.cardHeader}>
         <h2 className={styles.cardTitle}>{label}</h2>
         <span className={isConnected ? styles.dotOn : styles.dotOff} aria-hidden />
-        <span className={styles.srOnly}>
-          {isConnected ? "Connected" : "Not connected"}
-        </span>
+        <span className="sr-only">{isConnected ? "Connected" : "Not connected"}</span>
       </header>
 
       {isConnected ? (
@@ -274,22 +249,23 @@ function PlatformCard({
         <p className={styles.blurb}>{blurb}</p>
       )}
 
+      {/* Why the Connect button below is dead. A notice, not an error: nothing
+          has gone wrong, the network is simply not open to us yet. */}
       {hold ? (
-        <p id={holdId} className={styles.hold}>
+        <Callout id={holdId} tone="warn" size="sm">
           {hold}
-        </p>
+        </Callout>
       ) : null}
 
       <footer className={styles.cardFooter}>
-        <button
-          type="button"
-          className={isConnected ? styles.secondaryButton : styles.primaryButton}
+        <Button
+          variant={isConnected ? "secondary" : "primary"}
           onClick={onConnect}
           disabled={busy !== null || hold !== null}
           aria-describedby={hold ? holdId : undefined}
         >
           {isConnected ? "Reconnect" : `Connect ${label}`}
-        </button>
+        </Button>
       </footer>
     </article>
   );
@@ -316,9 +292,7 @@ function AccountRow({
         {account.handle ? (
           <p className={styles.accountHandle}>@{account.handle}</p>
         ) : null}
-        {account.is_active ? (
-          <span className={styles.destination}>Destination</span>
-        ) : null}
+        {account.is_active ? <Badge tone="accent">Destination</Badge> : null}
       </div>
 
       {expiry.kind === "expired" ? (
@@ -337,31 +311,16 @@ function AccountRow({
 
       <div className={styles.accountActions}>
         {account.is_active ? null : (
-          <button
-            type="button"
-            className={styles.linkButton}
-            onClick={onActivate}
-            disabled={isBusy}
-          >
+          <Button variant="link" size="sm" onClick={onActivate} disabled={isBusy}>
             Use this one
-          </button>
+          </Button>
         )}
-        <button
-          type="button"
-          className={styles.linkButton}
-          onClick={onVerify}
-          disabled={isBusy}
-        >
+        <Button variant="link" size="sm" onClick={onVerify} disabled={isBusy}>
           Check connection
-        </button>
-        <button
-          type="button"
-          className={styles.dangerButton}
-          onClick={onDisconnect}
-          disabled={isBusy}
-        >
+        </Button>
+        <Button variant="linkDanger" size="sm" onClick={onDisconnect} disabled={isBusy}>
           Disconnect
-        </button>
+        </Button>
       </div>
     </li>
   );
@@ -371,7 +330,7 @@ export default function SettingsPage() {
   // useSearchParams needs a Suspense boundary to keep the route statically
   // renderable in the app router.
   return (
-    <Suspense fallback={<p>Loading connections…</p>}>
+    <Suspense fallback={<EmptyState>Loading connections…</EmptyState>}>
       <SettingsContent />
     </Suspense>
   );

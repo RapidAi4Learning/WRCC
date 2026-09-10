@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import SyncReviewPanel from "@/components/SyncReviewPanel";
+import SyncReviewPanel from "@/components/catalog/SyncReviewPanel";
 import type { Changeset, SyncRun } from "@/types/course";
 
 function run(changeset: Changeset, overrides: Partial<SyncRun> = {}): SyncRun {

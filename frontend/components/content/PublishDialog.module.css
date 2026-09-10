@@ -1,0 +1,147 @@
+/* Messages sit between the dialog header and its body. */
+.message {
+  margin: var(--space-3) var(--space-5) 0;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.sectionWide {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* Where the post lands is the single most consequential fact on this screen,
+   so it gets the largest type in the body. */
+.destination {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.destinationHandle {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.destinationMissing {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+}
+
+.inlineLink {
+  color: inherit;
+  font-weight: 600;
+}
+
+.muted {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.imageCount {
+  font-weight: 400;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.thumbs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.counter,
+.counterOver {
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.counter {
+  color: var(--color-text-muted);
+}
+
+.counterOver {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+/* ── Footer ── */
+
+.footerStatus,
+.confirmText {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-right: auto;
+}
+
+.confirmText {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* ── Success ── */
+
+.success {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-5);
+}
+
+.successTitle {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-accent-strong);
+}
+
+.viewPost {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-accent);
+  text-decoration: none;
+  border-bottom: 2px solid var(--color-accent-soft);
+}
+
+.viewPost:hover {
+  border-bottom-color: var(--color-accent);
+}
+
+@media (max-width: 44rem) {
+  .body {
+    grid-template-columns: 1fr;
+  }
+}

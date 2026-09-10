@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import PublishDialog from "@/components/PublishDialog";
+import PublishDialog from "@/components/content/PublishDialog";
 import type { MediaAsset, ContentItem } from "@/types/content";
 import type { Publication, PublishPreflight } from "@/types/publishing";
 

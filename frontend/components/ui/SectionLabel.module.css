@@ -1,0 +1,27 @@
+.label {
+  margin: 0;
+  padding: 0;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.xs {
+  font-size: var(--text-xs);
+}
+
+.sm {
+  font-size: var(--text-sm);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.brand {
+  color: var(--color-accent-strong);
+}
+
+.step {
+  white-space: nowrap;
+}

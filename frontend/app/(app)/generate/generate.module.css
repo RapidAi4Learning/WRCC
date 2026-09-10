@@ -4,18 +4,6 @@
   gap: var(--space-8);
 }
 
-.title {
-  margin: 0 0 var(--space-1);
-  font-size: var(--text-display);
-  line-height: 1.1;
-}
-
-.lede {
-  margin: 0;
-  color: var(--color-text-muted);
-  max-width: 46rem;
-}
-
 /* Two-pane workspace: compact compose form on the left, results on the
    right — generating never pushes the output below the fold. */
 .workspace {
@@ -29,14 +17,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  box-shadow: var(--shadow-raised);
   /* Stays alongside the results while they scroll (below the app header). */
   position: sticky;
-  top: 4.5rem;
+  top: calc(var(--header-height) + var(--space-3));
   max-height: calc(100vh - 6rem);
   overflow-y: auto;
 }
@@ -57,50 +40,14 @@
   border: none;
   margin: 0;
   padding: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-4);
 }
 
 .legend {
-  font-size: var(--text-sm);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-accent-strong);
-  padding: 0;
   margin-bottom: var(--space-2);
-}
-
-.label {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  margin-top: var(--space-3);
-}
-
-.optional {
-  font-weight: 400;
-  color: var(--color-text-muted);
-}
-
-.input,
-.textarea {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
-  font: inherit;
-  font-size: var(--text-base);
-  background: var(--color-surface);
-}
-
-.input:focus,
-.textarea:focus {
-  border-color: var(--color-accent);
-  outline: none;
-}
-
-.textarea {
-  resize: vertical;
 }
 
 .platforms {
@@ -109,80 +56,8 @@
   flex-wrap: wrap;
 }
 
-/* Toggle chips: the pill itself shows the checked state, so the three
-   platforms fit on one row inside the narrow compose column. */
-.platformOption {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  transition:
-    border-color var(--duration-fast) var(--ease-out),
-    background var(--duration-fast) var(--ease-out);
-}
-
-.platformOption input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.platformOption:hover {
-  border-color: var(--color-accent);
-}
-
-.platformOption:has(input:checked) {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-}
-
-.platformOption:has(input:focus-visible) {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
-.error {
-  margin: 0;
-  color: var(--color-danger);
-  background: var(--color-danger-soft);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
-}
-
-.warning {
-  margin: 0;
-  color: var(--color-warn);
-  background: var(--color-warn-soft);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
-}
-
 .submit {
   align-self: flex-start;
-  border: none;
-  background: var(--color-accent);
-  color: #fff;
-  font-size: var(--text-base);
-  font-weight: 600;
-  padding: var(--space-3) var(--space-6);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-out);
-}
-
-.submit:hover:not(:disabled) {
-  background: var(--color-accent-strong);
-}
-
-.submit:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 
 .results {
@@ -190,36 +65,6 @@
   flex-direction: column;
   gap: var(--space-4);
   min-width: 0; /* let the grid column shrink instead of overflowing */
-}
-
-.tabs {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.tab,
-.tabActive {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  cursor: pointer;
-  transition:
-    border-color var(--duration-fast) var(--ease-out),
-    background var(--duration-fast) var(--ease-out);
-}
-
-.tab:hover {
-  border-color: var(--color-accent);
-}
-
-.tabActive {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
 }
 
 .tabCount {
@@ -233,30 +78,4 @@
   grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
   gap: var(--space-4);
   align-items: start;
-}
-
-.empty {
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-12) var(--space-6);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  text-align: center;
-  min-height: 16rem;
-  justify-content: center;
-}
-
-.emptyTitle {
-  margin: 0;
-  font-weight: 700;
-  color: var(--color-text-muted);
-}
-
-.emptyHint {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  max-width: 24rem;
 }

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import PostPreview from "@/components/PostPreview";
+import PostPreview from "@/components/content/PostPreview";
 import type { MediaAsset } from "@/types/content";
 import type { SocialAccount } from "@/types/publishing";
 

@@ -106,6 +106,12 @@ for (const width of WIDTHS) {
         await expect(page.getByText("WRCC Company Page")).toBeVisible();
         await shot(page, "08-settings", width);
       });
+
+      test("ui kit", async ({ page }) => {
+        await page.goto("/ui-kit");
+        await expect(page.getByRole("heading", { name: "UI kit" })).toBeVisible();
+        await shot(page, "09-ui-kit", width);
+      });
     });
   });
 }

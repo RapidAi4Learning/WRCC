@@ -1,0 +1,71 @@
+.control {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+
+.input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-size: var(--text-base);
+  color: inherit;
+  background: var(--color-surface);
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.sm .input,
+.select.sm {
+  font-size: var(--text-sm);
+}
+
+.multiline .input {
+  resize: vertical;
+}
+
+.hasIcon .input {
+  padding-left: 2.5rem;
+}
+
+.leading {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.multiline .leading {
+  top: var(--space-3);
+  transform: none;
+}
+
+/* Room for the trailing control, so long input never runs underneath it. */
+.hasTrailing .input {
+  padding-right: 4.25rem;
+}
+
+.trailing {
+  position: absolute;
+  right: var(--space-1);
+  top: var(--space-1);
+  bottom: var(--space-1);
+  display: flex;
+}
+
+.select {
+  flex: none;
+  width: auto;
+  background: var(--color-surface-raised);
+}

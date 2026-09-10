@@ -1,0 +1,31 @@
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.line {
+  height: 1rem;
+}
+
+.block {
+  height: 3.6rem;
+}
+
+.image {
+  aspect-ratio: 1;
+  max-width: 16rem;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}

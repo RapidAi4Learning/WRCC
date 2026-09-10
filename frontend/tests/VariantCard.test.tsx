@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import VariantCard from "@/components/VariantCard";
+import VariantCard from "@/components/content/VariantCard";
 import type { ContentItem } from "@/types/content";
 import type { Publication } from "@/types/publishing";
 

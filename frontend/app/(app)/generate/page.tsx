@@ -5,19 +5,33 @@
 
 import { FormEvent, useState } from "react";
 
-import { ApiError, generateContent } from "@/lib/api";
+import { generateContent } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
+import { PLATFORMS } from "@/lib/platforms";
 import type {
   ContentItem,
   GenerateContentResult,
   Platform,
 } from "@/types/content";
 import type { Course } from "@/types/course";
-import CoursePicker from "@/components/CoursePicker";
-import VariantCard from "@/components/VariantCard";
-import { PlatformBadge } from "@/components/Badges";
+import CoursePicker from "@/components/content/CoursePicker";
+import VariantCard from "@/components/content/VariantCard";
+import { PlatformBadge } from "@/components/content/Badges";
+import {
+  Button,
+  Callout,
+  EmptyState,
+  Field,
+  PageHeader,
+  SectionLabel,
+  Tab,
+  TabList,
+  TextArea,
+  TextInput,
+  ToggleChip,
+  cardClass,
+} from "@/components/ui";
 import styles from "./generate.module.css";
-
-const ALL_PLATFORMS: Platform[] = ["facebook", "instagram", "linkedin"];
 
 export default function GeneratePage() {
   const [course, setCourse] = useState<Course | null>(null);
@@ -57,9 +71,7 @@ export default function GeneratePage() {
       setResult(generated);
       setActivePlatform(generated.items[0]?.platform ?? null);
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Generation failed. Try again.",
-      );
+      setError(errorMessage(err, "Generation failed. Try again."));
     } finally {
       setIsGenerating(false);
     }
@@ -85,7 +97,7 @@ export default function GeneratePage() {
       item,
     ]);
   }
-  const resultPlatforms = ALL_PLATFORMS.filter((platform) =>
+  const resultPlatforms = PLATFORMS.filter((platform) =>
     itemsByPlatform.has(platform),
   );
   // Guard against a stale tab (e.g. platform deselected on the next run).
@@ -96,148 +108,142 @@ export default function GeneratePage() {
 
   return (
     <div className={styles.page}>
-      <header>
-        <h1 className={styles.title}>Generate content</h1>
-        <p className={styles.lede}>
-          Three post ideas per platform — grounded in a real course from the
-          catalog, or in a free topic.
-        </p>
-      </header>
+      <PageHeader
+        title="Generate content"
+        lede="Three post ideas per platform — grounded in a real course from the catalog, or in a free topic."
+      />
 
       <div className={styles.workspace}>
-      <form className={styles.form} onSubmit={handleSubmit}>
-        <fieldset className={styles.fieldset}>
-          <legend className={styles.legend}>1 · Create a post</legend>
-          <label className={styles.label}>Course from the catalog</label>
-          <CoursePicker selected={course} onSelect={setCourse} />
+        <form className={cardClass({ className: styles.form })} onSubmit={handleSubmit}>
+          <fieldset className={styles.fieldset}>
+            <SectionLabel as="legend" step={1} size="sm" tone="brand" className={styles.legend}>
+              Create a post
+            </SectionLabel>
+            <Field label="Course from the catalog">
+              <CoursePicker selected={course} onSelect={setCourse} />
+            </Field>
 
-          <label className={styles.label} htmlFor="topic">
-            …or a free topic
-          </label>
-          <input
-            id="topic"
-            className={styles.input}
-            placeholder="e.g. Spring first aid enrolments in Griffith"
-            value={topic}
-            onChange={(event) => setTopic(event.target.value)}
-          />
+            <Field label="…or a free topic" htmlFor="topic">
+              <TextInput
+                id="topic"
+                placeholder="e.g. Spring first aid enrolments in Griffith"
+                value={topic}
+                onChange={(event) => setTopic(event.target.value)}
+              />
+            </Field>
 
-          <label className={styles.label} htmlFor="reference">
-            Reference URL <span className={styles.optional}>(optional)</span>
-          </label>
-          <input
-            id="reference"
-            type="url"
-            className={styles.input}
-            placeholder="https://…"
-            value={referenceUrl}
-            onChange={(event) => setReferenceUrl(event.target.value)}
-          />
+            <Field label="Reference URL" htmlFor="reference" isOptional>
+              <TextInput
+                id="reference"
+                type="url"
+                placeholder="https://…"
+                value={referenceUrl}
+                onChange={(event) => setReferenceUrl(event.target.value)}
+              />
+            </Field>
 
-          <label className={styles.label} htmlFor="notes">
-            Notes <span className={styles.optional}>(optional)</span>
-          </label>
-          <textarea
-            id="notes"
-            className={styles.textarea}
-            rows={3}
-            placeholder="Anything the posts must mention"
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-          />
-        </fieldset>
+            <Field label="Notes" htmlFor="notes" isOptional>
+              <TextArea
+                id="notes"
+                rows={3}
+                placeholder="Anything the posts must mention"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+              />
+            </Field>
+          </fieldset>
 
-        <fieldset className={styles.fieldset}>
-          <legend className={styles.legend}>2 · Platforms</legend>
-          <div className={styles.platforms}>
-            {ALL_PLATFORMS.map((platform) => (
-              <label key={platform} className={styles.platformOption}>
-                <input
-                  type="checkbox"
+          <fieldset className={styles.fieldset}>
+            <SectionLabel as="legend" step={2} size="sm" tone="brand" className={styles.legend}>
+              Platforms
+            </SectionLabel>
+            {/* Toggle chips: the chip itself shows the checked state, so the
+                three platforms fit on one row inside the narrow column. */}
+            <div className={styles.platforms}>
+              {PLATFORMS.map((platform) => (
+                <ToggleChip
+                  key={platform}
                   checked={platforms.includes(platform)}
                   onChange={() => togglePlatform(platform)}
-                />
-                <PlatformBadge platform={platform} />
-              </label>
-            ))}
-          </div>
-        </fieldset>
+                >
+                  <PlatformBadge platform={platform} />
+                </ToggleChip>
+              ))}
+            </div>
+          </fieldset>
 
-        {error ? (
-          <p role="alert" className={styles.error}>
-            {error}
-          </p>
-        ) : null}
+          {error ? (
+            <Callout tone="danger" role="alert">
+              {error}
+            </Callout>
+          ) : null}
 
-        <button
-          type="submit"
-          className={styles.submit}
-          disabled={!canSubmit || isGenerating}
-        >
-          {isGenerating ? "Generating…" : "Generate 3 ideas per platform"}
-        </button>
-      </form>
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            className={styles.submit}
+            disabled={!canSubmit || isGenerating}
+          >
+            {isGenerating ? "Generating…" : "Generate 3 ideas per platform"}
+          </Button>
+        </form>
 
-      <section className={styles.results} aria-label="Generated variants">
-        {result ? (
-          <>
-            {result.warnings.map((warning) => (
-              <p key={warning} className={styles.warning}>
-                ⚠ {warning}
-              </p>
-            ))}
+        <section className={styles.results} aria-label="Generated variants">
+          {result ? (
+            <>
+              {result.warnings.map((warning) => (
+                <Callout key={warning} tone="warn">
+                  ⚠ {warning}
+                </Callout>
+              ))}
 
-            {resultPlatforms.length > 1 ? (
-              <div className={styles.tabs} role="tablist" aria-label="Platform">
-                {resultPlatforms.map((platform) => (
-                  <button
-                    key={platform}
-                    type="button"
-                    role="tab"
-                    aria-selected={platform === shownPlatform}
-                    className={
-                      platform === shownPlatform ? styles.tabActive : styles.tab
-                    }
-                    onClick={() => setActivePlatform(platform)}
-                  >
-                    <PlatformBadge platform={platform} />
-                    <span className={styles.tabCount}>
-                      {itemsByPlatform.get(platform)!.length}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
+              {resultPlatforms.length > 1 ? (
+                <TabList label="Platform">
+                  {resultPlatforms.map((platform) => (
+                    <Tab
+                      key={platform}
+                      isSelected={platform === shownPlatform}
+                      onClick={() => setActivePlatform(platform)}
+                    >
+                      <PlatformBadge platform={platform} />
+                      <span className={styles.tabCount}>
+                        {itemsByPlatform.get(platform)!.length}
+                      </span>
+                    </Tab>
+                  ))}
+                </TabList>
+              ) : null}
 
-            {shownPlatform ? (
-              <div
-                key={shownPlatform}
-                role={resultPlatforms.length > 1 ? "tabpanel" : undefined}
-                className={styles.cards}
-              >
-                {itemsByPlatform.get(shownPlatform)!.map((item) => (
-                  <VariantCard
-                    key={item.id}
-                    item={item}
-                    onChange={handleItemChange}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </>
-        ) : (
-          <div className={styles.empty} aria-hidden="true">
-            <p className={styles.emptyTitle}>
-              {isGenerating ? "Generating ideas…" : "Your ideas land here"}
-            </p>
-            <p className={styles.emptyHint}>
+              {shownPlatform ? (
+                <div
+                  key={shownPlatform}
+                  role={resultPlatforms.length > 1 ? "tabpanel" : undefined}
+                  className={styles.cards}
+                >
+                  {itemsByPlatform.get(shownPlatform)!.map((item) => (
+                    <VariantCard
+                      key={item.id}
+                      item={item}
+                      onChange={handleItemChange}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <EmptyState
+              variant="dashed"
+              size="lg"
+              aria-hidden="true"
+              title={isGenerating ? "Generating ideas…" : "Your ideas land here"}
+            >
               {isGenerating
                 ? "The AI is drafting three variants per platform."
                 : "Fill in the left panel and generate — results appear side by side, no scrolling."}
-            </p>
-          </div>
-        )}
-      </section>
+            </EmptyState>
+          )}
+        </section>
       </div>
     </div>
   );

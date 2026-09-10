@@ -1,0 +1,96 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: var(--color-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+}
+
+.dialog {
+  width: min(46rem, 100%);
+  max-height: min(88vh, 52rem);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+}
+
+/* The container takes focus on open so no action is pre-selected; it needs no
+   ring of its own, the dialog is already the obvious focus of the screen. */
+.dialog:focus {
+  outline: none;
+}
+
+.sm {
+  width: min(28rem, 100%);
+}
+
+.md {
+  width: min(46rem, 100%);
+}
+
+.lg {
+  width: min(68rem, 100%);
+  max-height: min(85vh, 52rem);
+}
+
+.dialog[data-accent] {
+  border-top: 3px solid var(--color-accent);
+}
+
+.dialog[data-accent="facebook"] {
+  border-top-color: var(--color-facebook);
+}
+
+.dialog[data-accent="instagram"] {
+  border-top-color: var(--color-instagram);
+}
+
+.dialog[data-accent="linkedin"] {
+  border-top-color: var(--color-linkedin);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+@media (max-width: 44rem) {
+  .backdrop {
+    padding: var(--space-3);
+  }
+
+  .footer {
+    flex-wrap: wrap;
+  }
+}

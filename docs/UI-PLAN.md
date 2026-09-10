@@ -278,7 +278,38 @@ Tests que cambian en esta fase (y solo en esta): `SettingsPage.test.tsx`
 | Focus trap del `Modal` rompe algún test de MediaPanel/PublishDialog | Se introduce en 1b con tests propios, antes de migrar los diálogos. |
 | Fondo decorativo afecta rendimiento o legibilidad | SVG estático, `position: fixed`, sin animación, opacidad baja; se quita en móvil si hace falta. |
 
-## 5. Estimación
+## 5. Registro de ejecución
+
+Rama: `feat/ui-redesign`. Un commit por fase.
+
+**Fase 0 — hecha.** `e2e/visual.spec.ts` + `e2e/support/mockApi.ts` capturan
+las 9 vistas a 375/1024/1440 contra una API simulada (sin backend). Se ejecuta
+con `SHOTS_LABEL=<etiqueta> npx playwright test visual`; las capturas van a
+`e2e/shots/<etiqueta>/`, **ignoradas por git** (son comparaciones locales, y la
+baseline de regresión versionada llega en la Fase 6). La baseline ya mostró un
+bug real: a 375px el header desborda la página hasta ~748px (se arregla en la
+Fase 3).
+
+**Fase 1 — hecha.** 160 tests previos pasan sin tocar una sola aserción; +30
+tests nuevos (primitivos, Modal, utilidades). Desvíos respecto del plan:
+- `useAsyncAction` **descartado**: los tres candidatos no comparten forma
+  (Settings guarda *qué* cuenta está ocupada, VariantCard *qué* acción), así que
+  el hook no quitaba código real.
+- `Card` es la función `cardClass()` en vez de un componente: los sitios que la
+  usan son `<form>`, `<article>` y `<section>`, y un componente polimórfico solo
+  para eso no compensaba.
+- `VisuallyHidden` es la utilidad global `.sr-only`.
+- Los blancos translúcidos de `PostPreview` (flechas y puntos del carrusel de
+  Instagram) siguen como literales a propósito: imitan la interfaz de la red,
+  no la marca.
+- `Modal` añade foco inicial, trampa de Tab, devolución del foco y cierre con
+  Esc solo del diálogo superior (por profundidad de anidamiento).
+
+Métrica: CSS de pantallas/componentes **2 885 → 1 470 líneas** (−49 %); con
+las 793 líneas de los 16 primitivos, el total queda en 2 263 (−22 %). Único
+literal de color fuera de `tokens.css`: el chrome de Instagram citado arriba.
+
+## 6. Estimación
 
 | Fase | Días |
 |---|---|
