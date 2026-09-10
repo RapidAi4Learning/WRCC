@@ -18,6 +18,11 @@
   max-width: 16rem;
 }
 
+.card {
+  height: 22rem;
+  border-radius: var(--radius-lg);
+}
+
 @keyframes pulse {
   50% {
     opacity: 0.45;

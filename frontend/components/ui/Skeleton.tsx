@@ -2,8 +2,11 @@ import { cx } from "@/lib/cx";
 import styles from "./Skeleton.module.css";
 
 export interface SkeletonProps {
-  /** `line`: a text-sized bar. `block`: a suggestion-sized card. `image`: a square. */
-  variant?: "line" | "block" | "image";
+  /**
+   * `line`: a text-sized bar. `block`: a suggestion-sized card. `image`: a
+   * square. `card`: a whole result card.
+   */
+  variant?: "line" | "block" | "image" | "card";
   className?: string;
 }
 

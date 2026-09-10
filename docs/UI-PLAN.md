@@ -321,6 +321,17 @@ menú plegable por debajo de 48rem —que corrige el desborde a 375px de la
 baseline—, fondo de pétalos (`PageBackground`) y login con el mismo lenguaje.
 La tagline sigue sin mostrarse: el hueco está marcado en `AppHeader`.
 
+**Fase 4 — hecha.** Generate replica el mockup: card de composición de ~31rem,
+inputs con icono (buscar, lápiz, enlace, documento), regla entre los dos
+pasos, chips de plataforma con la marca real a tres columnas (`PlatformName`,
+reutilizable en pestañas y tarjetas), CTA a todo el ancho con destellos,
+estado vacío punteado con ilustración (`IdeasIllustration`) y, mientras se
+genera, tres tarjetas esqueleto con un aviso `role="status"` para lectores de
+pantalla. Bug encontrado y corregido de paso: el `matcher` del middleware
+también redirigía `/brand/*` al login, así que el optimizador de imágenes
+recibía HTML en vez del logo (en producción, el login se habría quedado sin
+logo).
+
 ## 6. Estimación
 
 | Fase | Días |

@@ -27,5 +27,11 @@ export function middleware(request: NextRequest) {
 export const config = {
   // Exclude API paths: the backend enforces their auth and returns JSON 401s.
   // Redirecting them to the HTML login page would break the same-origin proxy.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/).*)"],
+  // Public assets (the brand logo and any static image) are excluded too: the
+  // login page shows the logo to signed-out visitors, and the image optimiser
+  // fetches it without a session cookie — a redirect there serves HTML where
+  // the optimiser expects an image.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|api/|brand/|.*\\.(?:png|jpe?g|svg|webp|ico)$).*)",
+  ],
 };

@@ -1,0 +1,23 @@
+.art {
+  display: block;
+  width: 12.5rem;
+  max-width: 100%;
+  height: auto;
+}
+
+.rays {
+  stroke: var(--brand-lime-500);
+}
+
+.page {
+  fill: var(--brand-purple-100);
+  stroke: var(--brand-purple-500);
+}
+
+.lines {
+  stroke: var(--brand-purple-700);
+}
+
+.spark {
+  fill: var(--brand-lime-600);
+}

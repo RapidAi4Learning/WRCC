@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { fetchCourses } from "@/lib/api";
 import type { Course } from "@/types/course";
+import { Search } from "@/components/icons";
 import { Button, TextInput } from "@/components/ui";
 import styles from "./CoursePicker.module.css";
 
@@ -60,6 +61,7 @@ export default function CoursePicker({ selected, onSelect }: CoursePickerProps) 
     <div className={styles.picker}>
       <TextInput
         type="search"
+        icon={<Search size={20} />}
         placeholder="Search the course catalog…"
         value={query}
         onFocus={() => setIsOpen(true)}

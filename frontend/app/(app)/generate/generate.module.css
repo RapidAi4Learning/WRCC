@@ -4,12 +4,12 @@
   gap: var(--space-8);
 }
 
-/* Two-pane workspace: compact compose form on the left, results on the
-   right — generating never pushes the output below the fold. */
+/* Two-pane workspace: the compose card on the left, results on the right —
+   generating never pushes the output below the fold. */
 .workspace {
   display: grid;
-  grid-template-columns: minmax(19rem, 23rem) 1fr;
-  gap: var(--space-6);
+  grid-template-columns: minmax(20rem, 31rem) minmax(0, 1fr);
+  gap: var(--space-8);
   align-items: start;
 }
 
@@ -19,14 +19,15 @@
   gap: var(--space-5);
   /* Stays alongside the results while they scroll (below the app header). */
   position: sticky;
-  top: calc(var(--header-height) + var(--space-3));
-  max-height: calc(100vh - 6rem);
+  top: calc(var(--header-height) + var(--space-4));
+  max-height: calc(100vh - var(--header-height) - var(--space-8));
   overflow-y: auto;
 }
 
 @media (max-width: 64rem) {
   .workspace {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-6);
   }
 
   .form {
@@ -46,18 +47,27 @@
   gap: var(--space-4);
 }
 
+/* A rule between the two steps, as in the brand mockup. An <hr>, not a
+   fieldset border: a fieldset's border wraps around its legend, which would
+   run the line through "2 · Platforms" instead of above it. */
+.divider {
+  margin: 0;
+  border: none;
+  border-top: 1px solid var(--color-border);
+}
+
 .legend {
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
 .platforms {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--space-3);
 }
 
-.submit {
-  align-self: flex-start;
+.platformChip {
+  padding: var(--space-3) var(--space-2);
 }
 
 .results {
@@ -67,10 +77,24 @@
   min-width: 0; /* let the grid column shrink instead of overflowing */
 }
 
+/* The empty panel stands as tall as the compose card beside it. */
+.empty {
+  min-height: 28rem;
+}
+
+.tab {
+  padding: var(--space-2) var(--space-4);
+}
+
 .tabCount {
+  min-width: 1.5rem;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
   font-size: var(--text-xs);
   font-weight: 700;
   color: var(--color-text-muted);
+  text-align: center;
 }
 
 .cards {

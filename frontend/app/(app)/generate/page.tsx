@@ -15,8 +15,10 @@ import type {
 } from "@/types/content";
 import type { Course } from "@/types/course";
 import CoursePicker from "@/components/content/CoursePicker";
+import IdeasIllustration from "@/components/content/IdeasIllustration";
 import VariantCard from "@/components/content/VariantCard";
-import { PlatformBadge } from "@/components/content/Badges";
+import { PlatformName } from "@/components/content/Badges";
+import { FileText, Link2, Pencil, Sparkles } from "@/components/icons";
 import {
   Button,
   Callout,
@@ -24,6 +26,7 @@ import {
   Field,
   PageHeader,
   SectionLabel,
+  Skeleton,
   Tab,
   TabList,
   TextArea,
@@ -32,6 +35,8 @@ import {
   cardClass,
 } from "@/components/ui";
 import styles from "./generate.module.css";
+
+const VARIANTS_PER_PLATFORM = 3;
 
 export default function GeneratePage() {
   const [course, setCourse] = useState<Course | null>(null);
@@ -106,6 +111,80 @@ export default function GeneratePage() {
       ? activePlatform
       : resultPlatforms[0] ?? null;
 
+  function renderResults() {
+    // A fresh run replaces the old results, so while it is running the panel
+    // shows the shape of what is coming rather than the previous batch.
+    if (isGenerating) {
+      return (
+        <>
+          <p role="status" className="sr-only">
+            Generating ideas…
+          </p>
+          <div className={styles.cards} aria-hidden="true">
+            {Array.from({ length: VARIANTS_PER_PLATFORM }, (_, index) => (
+              <Skeleton key={index} variant="card" />
+            ))}
+          </div>
+        </>
+      );
+    }
+
+    if (!result) {
+      return (
+        <EmptyState
+          variant="dashed"
+          size="lg"
+          className={styles.empty}
+          icon={<IdeasIllustration />}
+          title="Your ideas land here"
+        >
+          Fill in the left panel and generate — results appear side by side, no
+          scrolling.
+        </EmptyState>
+      );
+    }
+
+    return (
+      <>
+        {result.warnings.map((warning) => (
+          <Callout key={warning} tone="warn">
+            ⚠ {warning}
+          </Callout>
+        ))}
+
+        {resultPlatforms.length > 1 ? (
+          <TabList label="Platform">
+            {resultPlatforms.map((platform) => (
+              <Tab
+                key={platform}
+                isSelected={platform === shownPlatform}
+                onClick={() => setActivePlatform(platform)}
+                className={styles.tab}
+              >
+                <PlatformName platform={platform} />
+                <span className={styles.tabCount}>
+                  {itemsByPlatform.get(platform)!.length}
+                </span>
+              </Tab>
+            ))}
+          </TabList>
+        ) : null}
+
+        {shownPlatform ? (
+          <div
+            key={shownPlatform}
+            role={resultPlatforms.length > 1 ? "tabpanel" : undefined}
+            className={styles.cards}
+          >
+            {itemsByPlatform.get(shownPlatform)!.map((item) => (
+              <VariantCard key={item.id} item={item} onChange={handleItemChange} />
+            ))}
+          </div>
+        ) : null}
+      </>
+    );
+  }
+
   return (
     <div className={styles.page}>
       <PageHeader
@@ -114,7 +193,10 @@ export default function GeneratePage() {
       />
 
       <div className={styles.workspace}>
-        <form className={cardClass({ className: styles.form })} onSubmit={handleSubmit}>
+        <form
+          className={cardClass({ padding: "lg", className: styles.form })}
+          onSubmit={handleSubmit}
+        >
           <fieldset className={styles.fieldset}>
             <SectionLabel as="legend" step={1} size="sm" tone="brand" className={styles.legend}>
               Create a post
@@ -126,6 +208,7 @@ export default function GeneratePage() {
             <Field label="…or a free topic" htmlFor="topic">
               <TextInput
                 id="topic"
+                icon={<Pencil size={20} />}
                 placeholder="e.g. Spring first aid enrolments in Griffith"
                 value={topic}
                 onChange={(event) => setTopic(event.target.value)}
@@ -136,6 +219,7 @@ export default function GeneratePage() {
               <TextInput
                 id="reference"
                 type="url"
+                icon={<Link2 size={20} />}
                 placeholder="https://…"
                 value={referenceUrl}
                 onChange={(event) => setReferenceUrl(event.target.value)}
@@ -146,6 +230,7 @@ export default function GeneratePage() {
               <TextArea
                 id="notes"
                 rows={3}
+                icon={<FileText size={20} />}
                 placeholder="Anything the posts must mention"
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
@@ -153,20 +238,23 @@ export default function GeneratePage() {
             </Field>
           </fieldset>
 
+          <hr className={styles.divider} />
+
           <fieldset className={styles.fieldset}>
             <SectionLabel as="legend" step={2} size="sm" tone="brand" className={styles.legend}>
               Platforms
             </SectionLabel>
-            {/* Toggle chips: the chip itself shows the checked state, so the
-                three platforms fit on one row inside the narrow column. */}
+            {/* Toggle chips carrying each network's own mark: the chip itself
+                shows the checked state, three to a row. */}
             <div className={styles.platforms}>
               {PLATFORMS.map((platform) => (
                 <ToggleChip
                   key={platform}
+                  className={styles.platformChip}
                   checked={platforms.includes(platform)}
                   onChange={() => togglePlatform(platform)}
                 >
-                  <PlatformBadge platform={platform} />
+                  <PlatformName platform={platform} />
                 </ToggleChip>
               ))}
             </div>
@@ -182,7 +270,8 @@ export default function GeneratePage() {
             type="submit"
             variant="primary"
             size="lg"
-            className={styles.submit}
+            block
+            icon={<Sparkles size={22} />}
             disabled={!canSubmit || isGenerating}
           >
             {isGenerating ? "Generating…" : "Generate 3 ideas per platform"}
@@ -190,59 +279,7 @@ export default function GeneratePage() {
         </form>
 
         <section className={styles.results} aria-label="Generated variants">
-          {result ? (
-            <>
-              {result.warnings.map((warning) => (
-                <Callout key={warning} tone="warn">
-                  ⚠ {warning}
-                </Callout>
-              ))}
-
-              {resultPlatforms.length > 1 ? (
-                <TabList label="Platform">
-                  {resultPlatforms.map((platform) => (
-                    <Tab
-                      key={platform}
-                      isSelected={platform === shownPlatform}
-                      onClick={() => setActivePlatform(platform)}
-                    >
-                      <PlatformBadge platform={platform} />
-                      <span className={styles.tabCount}>
-                        {itemsByPlatform.get(platform)!.length}
-                      </span>
-                    </Tab>
-                  ))}
-                </TabList>
-              ) : null}
-
-              {shownPlatform ? (
-                <div
-                  key={shownPlatform}
-                  role={resultPlatforms.length > 1 ? "tabpanel" : undefined}
-                  className={styles.cards}
-                >
-                  {itemsByPlatform.get(shownPlatform)!.map((item) => (
-                    <VariantCard
-                      key={item.id}
-                      item={item}
-                      onChange={handleItemChange}
-                    />
-                  ))}
-                </div>
-              ) : null}
-            </>
-          ) : (
-            <EmptyState
-              variant="dashed"
-              size="lg"
-              aria-hidden="true"
-              title={isGenerating ? "Generating ideas…" : "Your ideas land here"}
-            >
-              {isGenerating
-                ? "The AI is drafting three variants per platform."
-                : "Fill in the left panel and generate — results appear side by side, no scrolling."}
-            </EmptyState>
-          )}
+          {renderResults()}
         </section>
       </div>
     </div>
