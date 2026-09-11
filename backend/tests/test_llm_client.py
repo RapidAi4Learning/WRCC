@@ -56,9 +56,11 @@ class _StubImages:
 
     def __init__(self) -> None:
         self.calls = 0
+        self.requests: list[dict[str, Any]] = []
 
     async def generate(self, **kwargs: Any) -> Any:
         self.calls += 1
+        self.requests.append(kwargs)
         raise RuntimeError("image provider down")
 
 
@@ -343,3 +345,26 @@ async def test_image_client_makes_one_bounded_attempt(monkeypatch) -> None:
     assert sdk.images.calls == 1
     assert sdk.kwargs["timeout"] == 100.0
     assert sdk.kwargs["max_retries"] == 0
+
+
+@pytest.mark.parametrize(
+    ("chosen", "sent"),
+    [(None, "medium"), ("low", "low"), ("medium", "medium")],
+)
+async def test_image_client_sends_the_chosen_quality(
+    monkeypatch, chosen: str | None, sent: str
+) -> None:
+    from app.llm.images import ImageGenerationError, OpenAIImageClient
+
+    monkeypatch.setattr("openai.AsyncOpenAI", _RecordingAsyncOpenAI)
+    client = OpenAIImageClient(
+        make_settings(llm_mock=False, llm_provider="openai", openai_api_key="k")
+    )
+    sdk = _RecordingAsyncOpenAI.last
+    assert sdk is not None
+
+    with pytest.raises(ImageGenerationError):
+        await client.generate_image("a classroom", quality=chosen)  # type: ignore[arg-type]
+
+    # No choice keeps IMAGE_QUALITY (medium by default).
+    assert sdk.images.requests[0]["quality"] == sent

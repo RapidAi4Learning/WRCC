@@ -27,7 +27,8 @@ import {
 } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { moveItem, toggleOrdered } from "@/lib/selection";
-import type { MediaAsset } from "@/types/content";
+import { useStoredChoice } from "@/lib/useStoredChoice";
+import type { ImageQuality, MediaAsset } from "@/types/content";
 import {
   ArrowDown,
   ArrowUp,
@@ -46,6 +47,7 @@ import {
   Modal,
   OrderBadge,
   SectionLabel,
+  SegmentedControl,
   SelectableThumb,
   Skeleton,
   Tab,
@@ -62,6 +64,20 @@ const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const ACCEPT_ATTRIBUTE = ACCEPTED_TYPES.join(",");
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const FALLBACK_IMAGE_SIZE = 512;
+
+// Time and cost against detail, remembered per browser. Draft is for trying
+// prompts out — about a quarter of the cost, but details such as a CPR
+// manikin come out visibly wrong; Standard is what the server does by default.
+// The times are gpt-image-1 at 1024×1024 against the live API: low 10–15 s,
+// medium 18–19 s (docs/GENERATION-LATENCY-PLAN.md). "high" is not offered: it
+// can outlast the server's image timeout.
+const QUALITY_STORAGE_KEY = "wrcc.media.quality";
+const DEFAULT_QUALITY: ImageQuality = "medium";
+const QUALITIES: ReadonlyArray<{ value: ImageQuality; label: string; hint: string }> = [
+  { value: "low", label: "Draft", hint: "~12 s" },
+  { value: "medium", label: "Standard", hint: "~20 s" },
+];
+const QUALITY_VALUES = QUALITIES.map((quality) => quality.value);
 
 type Tab = "generate" | "upload";
 
@@ -87,6 +103,11 @@ export default function MediaPanel({ itemId, onCountChange }: MediaPanelProps) {
   const [prompt, setPrompt] = useState("");
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [quality, chooseQuality] = useStoredChoice(
+    QUALITY_STORAGE_KEY,
+    QUALITY_VALUES,
+    DEFAULT_QUALITY,
+  );
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -206,7 +227,7 @@ export default function MediaPanel({ itemId, onCountChange }: MediaPanelProps) {
     setNotice(null);
     setIsGenerating(true);
     try {
-      await generateImage(itemId, trimmed);
+      await generateImage(itemId, trimmed, quality);
       // Re-read rather than splice: the server also attaches the new asset to
       // this post's selection, and guessing at that would drift.
       await loadMedia();
@@ -306,6 +327,13 @@ export default function MediaPanel({ itemId, onCountChange }: MediaPanelProps) {
         rows={5}
         placeholder="Describe the image you want, or pick a suggestion and edit it here."
         onChange={(event) => setPrompt(event.target.value)}
+      />
+      <SegmentedControl
+        label="Image quality"
+        name={`quality-${itemId}`}
+        value={quality}
+        options={QUALITIES}
+        onChange={chooseQuality}
       />
       <Button
         variant="primary"

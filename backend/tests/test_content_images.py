@@ -96,6 +96,46 @@ async def test_generate_validates_prompt(auth_client: AsyncClient) -> None:
     assert response.status_code == 422
 
 
+class _RecordingImages(MockImageClient):
+    def __init__(self) -> None:
+        self.qualities: list[str | None] = []
+
+    async def generate_image(self, prompt: str, *, quality=None) -> bytes:  # type: ignore[no-untyped-def]
+        self.qualities.append(quality)
+        return await super().generate_image(prompt, quality=quality)
+
+
+@pytest.mark.parametrize("quality", ["low", "medium", None])
+async def test_generate_passes_the_chosen_quality_to_the_client(
+    auth_client: AsyncClient, monkeypatch, quality: str | None
+) -> None:
+    recorder = _RecordingImages()
+    monkeypatch.setattr("app.content.media.get_image_client", lambda settings: recorder)
+    item_id = await _create_item(auth_client)
+
+    body: dict = {"prompt": "a bright classroom"}
+    if quality is not None:
+        body["quality"] = quality
+    response = await auth_client.post(f"/api/content/{item_id}/images", json=body)
+
+    assert response.status_code == 200, response.text
+    # None reaches the client as None: it falls back to IMAGE_QUALITY itself.
+    assert recorder.qualities == [quality]
+
+
+@pytest.mark.parametrize("quality", ["high", "auto", "", "draft"])
+async def test_generate_rejects_qualities_the_panel_does_not_offer(
+    auth_client: AsyncClient, quality: str
+) -> None:
+    item_id = await _create_item(auth_client)
+    response = await auth_client.post(
+        f"/api/content/{item_id}/images",
+        json={"prompt": "a bright classroom", "quality": quality},
+    )
+    # "high" can outlast the image timeout, so the API refuses it outright.
+    assert response.status_code == 422
+
+
 async def test_generate_404_for_unknown_item(auth_client: AsyncClient) -> None:
     response = await auth_client.post(
         "/api/content/00000000-0000-0000-0000-000000000000/images",

@@ -29,7 +29,7 @@ class _FailingSuggestions(SlowLLM):
 
 
 class _FailingImages:
-    async def generate_image(self, prompt: str) -> bytes:
+    async def generate_image(self, prompt: str, *, quality: str | None = None) -> bytes:
         from app.llm.images import IMAGE_UNAVAILABLE_MESSAGE
 
         raise ImageGenerationError(IMAGE_UNAVAILABLE_MESSAGE)

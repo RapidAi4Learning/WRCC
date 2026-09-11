@@ -15,6 +15,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AppEnv = Literal["local", "staging", "production"]
 ReasoningEffort = Literal["", "minimal", "low", "medium", "high"]
+ImageQuality = Literal["low", "medium", "high", "auto"]
 
 _AUTH_SECRET_PLACEHOLDER = "change-me-32-bytes-min"
 
@@ -117,7 +118,9 @@ class Settings(BaseSettings):
     # ── Images (mock-first: follows LLM_MOCK; live requires LLM_PROVIDER=openai) ──
     image_model: str = "gpt-image-1"
     image_size: str = "1024x1024"
-    image_quality: Literal["low", "medium", "high", "auto"] = "medium"
+    # The default for requests that do not choose; the Media panel offers
+    # low and medium per image (app.content.schemas.OfferedImageQuality).
+    image_quality: ImageQuality = "medium"
     # One attempt, bounded: an image takes tens of seconds, so a retry after a
     # timeout would itself run past the proxy limit.
     image_timeout_seconds: float = Field(

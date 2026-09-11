@@ -51,6 +51,10 @@ export interface GenerateContentResult {
   warnings: string[];
 }
 
+// Draft (low) or Standard (medium) for one generated image. The server accepts
+// exactly these; "high" can outlast its image timeout.
+export type ImageQuality = "low" | "medium";
+
 // Where an asset's bytes came from. Uploaded ones have a filename and no
 // prompt; generated ones the reverse.
 export type MediaSource = "generated" | "uploaded";

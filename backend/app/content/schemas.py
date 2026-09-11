@@ -15,6 +15,10 @@ from app.db.enums import ContentPlatform
 # request deadline, which is exactly the wait this setting exists to avoid.
 OfferedReasoningEffort = Literal["minimal", "low", "medium"]
 
+# The image qualities the Media panel offers. "high" is absent for the same
+# reason: a single high-quality image can outlast IMAGE_TIMEOUT_SECONDS.
+OfferedImageQuality = Literal["low", "medium"]
+
 
 class GenerateContentRequest(BaseModel):
     topic: str | None = Field(default=None, max_length=300)
@@ -83,6 +87,9 @@ class GenerateContentResponse(BaseModel):
 
 class GenerateImageRequest(BaseModel):
     prompt: str = Field(min_length=3, max_length=2000)
+    # Draft or standard, chosen per image. None keeps the server's
+    # IMAGE_QUALITY.
+    quality: OfferedImageQuality | None = None
 
 
 class MediaAssetOut(BaseModel):

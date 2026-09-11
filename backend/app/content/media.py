@@ -25,7 +25,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit import record_audit
-from app.config import Settings
+from app.config import ImageQuality, Settings
 from app.content.ingest import (
     MediaRejectedError,
     describe_generated,
@@ -201,11 +201,16 @@ class MediaService:
         )
 
     async def generate(
-        self, item_id: uuid.UUID, *, prompt: str, actor_id: uuid.UUID | None
+        self,
+        item_id: uuid.UUID,
+        *,
+        prompt: str,
+        actor_id: uuid.UUID | None,
+        quality: ImageQuality | None = None,
     ) -> MediaAsset:
         item = await self._get_item(item_id)
         client = get_image_client(self._settings)
-        png = await client.generate_image(prompt)
+        png = await client.generate_image(prompt, quality=quality)
         measured = describe_generated(png)
 
         asset = MediaAsset(
@@ -230,7 +235,12 @@ class MediaService:
             action="content_image.generate",
             entity_type="media_asset",
             entity_id=asset.id,
-            payload_diff={"content_item_id": str(item.id), "prompt": prompt},
+            payload_diff={
+                "content_item_id": str(item.id),
+                "prompt": prompt,
+                # Which quality made it, so draft and standard can be compared.
+                "quality": quality or self._settings.image_quality,
+            },
         )
         await self._session.flush()
         await self._auto_attach(item, asset.id)

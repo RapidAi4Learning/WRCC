@@ -135,11 +135,56 @@ describe("MediaPanel — generate and upload are separate actions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate image" }));
 
     await waitFor(() =>
-      expect(mockGenerate).toHaveBeenCalledWith("item-1", "A bright classroom"),
+      expect(mockGenerate).toHaveBeenCalledWith("item-1", "A bright classroom", "medium"),
     );
     // Re-read rather than splice: the server also attaches the new asset, and
     // guessing at that is how the panel would drift from the post.
     await waitFor(() => expect(mockFetchMedia).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("MediaPanel — image quality", () => {
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  async function generateWithPrompt() {
+    fireEvent.change(screen.getByLabelText("Edit suggestion or create prompt"), {
+      target: { value: "A bright classroom" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate image" }));
+    await waitFor(() => expect(mockGenerate).toHaveBeenCalled());
+  }
+
+  it("defaults to Standard", async () => {
+    await open();
+
+    expect(screen.getByRole("radio", { name: /Standard/ })).toBeChecked();
+  });
+
+  it("sends Draft as low and remembers it", async () => {
+    mockGenerate.mockResolvedValue(asset());
+    await open();
+
+    fireEvent.click(screen.getByRole("radio", { name: /Draft/ }));
+    await generateWithPrompt();
+
+    expect(mockGenerate).toHaveBeenCalledWith("item-1", "A bright classroom", "low");
+    expect(window.localStorage.getItem("wrcc.media.quality")).toBe("low");
+  });
+
+  it("starts from the remembered choice", async () => {
+    window.localStorage.setItem("wrcc.media.quality", "low");
+    await open();
+
+    expect(screen.getByRole("radio", { name: /Draft/ })).toBeChecked();
+  });
+
+  it("ignores a stored value it no longer offers", async () => {
+    window.localStorage.setItem("wrcc.media.quality", "high");
+    await open();
+
+    expect(screen.getByRole("radio", { name: /Standard/ })).toBeChecked();
   });
 });
 

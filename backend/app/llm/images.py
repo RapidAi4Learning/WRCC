@@ -13,7 +13,7 @@ import struct
 import zlib
 from typing import Protocol
 
-from app.config import Settings
+from app.config import ImageQuality, Settings
 from app.llm.client import generate_with_retries
 
 
@@ -31,8 +31,13 @@ IMAGE_UNAVAILABLE_MESSAGE = (
 
 
 class ImageClient(Protocol):
-    async def generate_image(self, prompt: str) -> bytes:
-        """Return the finished image as PNG bytes."""
+    async def generate_image(
+        self, prompt: str, *, quality: ImageQuality | None = None
+    ) -> bytes:
+        """Return the finished image as PNG bytes.
+
+        ``quality`` trades time and cost for detail; None keeps IMAGE_QUALITY.
+        """
         ...
 
 
@@ -67,7 +72,9 @@ def _solid_png(rgb: tuple[int, int, int], size: int = _MOCK_IMAGE_SIZE) -> bytes
 class MockImageClient:
     """Deterministic offline image client: prompt → solid-colour PNG."""
 
-    async def generate_image(self, prompt: str) -> bytes:
+    async def generate_image(
+        self, prompt: str, *, quality: ImageQuality | None = None
+    ) -> bytes:
         digest = hashlib.sha256(prompt.encode("utf-8")).digest()
         return _solid_png((digest[0], digest[1], digest[2]))
 
@@ -90,13 +97,17 @@ class OpenAIImageClient:
         self._size = settings.image_size
         self._quality = settings.image_quality
 
-    async def generate_image(self, prompt: str) -> bytes:
+    async def generate_image(
+        self, prompt: str, *, quality: ImageQuality | None = None
+    ) -> bytes:
+        chosen_quality = quality or self._quality
+
         async def attempt_once() -> bytes:
             response = await self._client.images.generate(
                 model=self._model,
                 prompt=prompt,
                 size=self._size,  # type: ignore[arg-type]
-                quality=self._quality,  # type: ignore[arg-type]
+                quality=chosen_quality,
                 n=1,
             )
             payload = response.data[0].b64_json if response.data else None

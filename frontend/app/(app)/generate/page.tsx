@@ -3,11 +3,12 @@
 // Compose screen: ground the generation in a real course OR a free topic
 // (+ optional reference URL and notes), pick platforms, get 3 ideas each.
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 
 import { generateContent } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { PLATFORMS } from "@/lib/platforms";
+import { useStoredChoice } from "@/lib/useStoredChoice";
 import type {
   ContentItem,
   GenerateContentResult,
@@ -52,10 +53,7 @@ const SPEEDS: ReadonlyArray<{ value: ReasoningEffort; label: string; hint: strin
   { value: "low", label: "Balanced", hint: "~15 s" },
   { value: "medium", label: "Best quality", hint: "30–60 s" },
 ];
-
-function isOfferedSpeed(value: string | null): value is ReasoningEffort {
-  return SPEEDS.some((speed) => speed.value === value);
-}
+const SPEED_VALUES = SPEEDS.map((speed) => speed.value);
 
 export default function GeneratePage() {
   const [course, setCourse] = useState<Course | null>(null);
@@ -67,28 +65,11 @@ export default function GeneratePage() {
   const [activePlatform, setActivePlatform] = useState<Platform | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [speed, setSpeed] = useState<ReasoningEffort>(DEFAULT_SPEED);
-
-  // Read after mount rather than in the initial state: the page is prerendered
-  // on the server, where there is no storage, and a first browser render that
-  // differed from it would not hydrate.
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(SPEED_STORAGE_KEY);
-      if (isOfferedSpeed(stored)) setSpeed(stored);
-    } catch {
-      // Storage blocked (private mode, site data off): keep the default.
-    }
-  }, []);
-
-  function chooseSpeed(next: ReasoningEffort) {
-    setSpeed(next);
-    try {
-      window.localStorage.setItem(SPEED_STORAGE_KEY, next);
-    } catch {
-      // Not remembered this time; the choice still applies to this page.
-    }
-  }
+  const [speed, chooseSpeed] = useStoredChoice(
+    SPEED_STORAGE_KEY,
+    SPEED_VALUES,
+    DEFAULT_SPEED,
+  );
 
   const canSubmit =
     platforms.length > 0 && (course !== null || topic.trim().length > 0);

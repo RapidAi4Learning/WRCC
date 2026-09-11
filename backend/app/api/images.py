@@ -131,7 +131,9 @@ async def generate_image(
     user: User = Depends(get_current_user),
 ) -> MediaAssetOut:
     try:
-        asset = await service.generate(item_id, prompt=body.prompt, actor_id=user.id)
+        asset = await service.generate(
+            item_id, prompt=body.prompt, actor_id=user.id, quality=body.quality
+        )
     except ContentItemNotFoundError as exc:
         raise HTTPException(status_code=_NOT_FOUND, detail=str(exc)) from exc
     except ImageGenerationError as exc:

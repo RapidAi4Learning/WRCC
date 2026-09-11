@@ -7,6 +7,7 @@ import type {
   ContentStatus,
   GenerateContentInput,
   GenerateContentResult,
+  ImageQuality,
   ImageSuggestions,
   MediaAsset,
   MediaLibrary,
@@ -139,10 +140,12 @@ export function fetchImageSuggestions(itemId: string): Promise<ImageSuggestions>
 export function generateImage(
   itemId: string,
   prompt: string,
+  // Absent keeps the server's IMAGE_QUALITY.
+  quality?: ImageQuality,
 ): Promise<MediaAsset> {
   return request<MediaAsset>(`/api/content/${itemId}/images`, {
     method: "POST",
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt, quality }),
   });
 }
 
