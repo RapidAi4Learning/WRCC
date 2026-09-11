@@ -26,3 +26,6 @@ playwright-report/
 .env.*
 !.env.example
 *.log
+
+# Planning notes stay local, out of the repository.
+docs/
