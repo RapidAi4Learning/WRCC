@@ -29,7 +29,13 @@ class SlowLLM:
         self.max_in_flight = 0
         self.started = 0
         self.completed = 0
+        # Every effort a generation asked for, in order.
+        self.efforts: list[str | None] = []
         self._mock = MockLLMClient()
+
+    def with_reasoning_effort(self, effort: str | None) -> SlowLLM:
+        self.efforts.append(effort)
+        return self
 
     async def generate_social_post(self, context: dict) -> SocialPostDraft:
         self.started += 1

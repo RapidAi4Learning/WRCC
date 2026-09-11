@@ -162,6 +162,16 @@ class ContentGenerationService:
         # the calls across every platform, not per platform.
         semaphore = asyncio.Semaphore(self._settings.llm_max_concurrency)
 
+        # The speed chosen on the Generate screen, else the server's setting.
+        llm = (
+            self._llm.with_reasoning_effort(request.reasoning_effort)
+            if request.reasoning_effort
+            else self._llm
+        )
+        effective_effort = (
+            request.reasoning_effort or self._settings.openai_reasoning_effort or None
+        )
+
         async def draft_everything() -> list[list[GeneratedDraft]]:
             reference_excerpt: str | None = None
             if request.reference_url:
@@ -172,7 +182,7 @@ class ContentGenerationService:
                     warnings.append(warning)
             return await run_all(
                 run_content_generator_variants(
-                    llm=self._llm,
+                    llm=llm,
                     platform=platform,
                     topic=request.topic,
                     notes=request.notes,
@@ -217,6 +227,9 @@ class ContentGenerationService:
                                 "generated_at": generated_at,
                                 "violation_count": draft.violation_count,
                                 "context": draft.context,
+                                # Which speed wrote it, so copy quality can
+                                # later be compared by effort.
+                                "reasoning_effort": effective_effort,
                                 "warnings": warnings,
                             },
                             created_by=actor_id,
@@ -247,7 +260,7 @@ class ContentGenerationService:
             ",".join(platform.value for platform in request.platforms),
             time.perf_counter() - started,
             "mock" if self._settings.llm_mock else self._settings.live_model_name,
-            self._settings.openai_reasoning_effort or "-",
+            effective_effort or "-",
         )
         return generation_group, items, warnings
 

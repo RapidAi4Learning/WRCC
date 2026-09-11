@@ -259,6 +259,46 @@ async def test_blank_effort_sends_nothing(monkeypatch) -> None:
     assert "reasoning_effort" not in sdk.completions.calls[0]
 
 
+async def test_the_effort_can_be_chosen_per_generation(monkeypatch) -> None:
+    client, sdk = _live_openai(monkeypatch, openai_reasoning_effort="low")
+
+    chosen = client.with_reasoning_effort("medium")
+    await chosen.generate_social_post({"platform_profile": {}})
+    await client.generate_social_post({"platform_profile": {}})
+
+    # A copy carries the choice; the configured client is left as it was, so
+    # one person's choice never leaks into the next request.
+    assert chosen is not client
+    assert sdk.completions.calls[0]["reasoning_effort"] == "medium"
+    assert sdk.completions.calls[1]["reasoning_effort"] == "low"
+
+
+def test_no_choice_keeps_the_configured_client(monkeypatch) -> None:
+    client, _ = _live_openai(monkeypatch)
+    assert client.with_reasoning_effort(None) is client
+
+
+async def test_a_chosen_effort_is_still_never_sent_to_non_reasoning_models(
+    monkeypatch,
+) -> None:
+    client, sdk = _live_openai(monkeypatch, openai_model="gpt-4.1-mini")
+
+    await client.with_reasoning_effort("medium").generate_social_post({"platform_profile": {}})
+
+    assert "reasoning_effort" not in sdk.completions.calls[0]
+
+
+def test_mock_and_gemini_accept_a_choice_and_ignore_it(monkeypatch) -> None:
+    mock = MockLLMClient()
+    assert mock.with_reasoning_effort("medium") is mock
+
+    monkeypatch.setattr("google.genai.Client", lambda **kwargs: object())
+    gemini = GeminiLLMClient(
+        make_settings(llm_mock=False, llm_provider="gemini", gemini_api_key="k")
+    )
+    assert gemini.with_reasoning_effort("medium") is gemini
+
+
 async def test_attempts_follow_the_setting(monkeypatch, no_backoff) -> None:
     client, sdk = _live_openai(monkeypatch, llm_max_attempts=1)
     sdk.completions._replies = [RuntimeError("timed out")]

@@ -106,6 +106,32 @@ async def test_regeneration_respects_the_deadline(db_session) -> None:
     assert await _item_count(db_session) == 3
 
 
+async def test_the_requested_effort_is_used_and_recorded(db_session) -> None:
+    llm = SlowLLM(delay=0.01)
+    service = ContentGenerationService(db_session, llm, make_settings())
+    request = GenerateContentRequest(
+        topic="Spring first aid", platforms=["facebook"], reasoning_effort="medium"
+    )
+
+    _, items, _ = await service.generate(request, actor_id=uuid.uuid4())
+
+    assert llm.efforts == ["medium"]
+    # Recorded on every post, so copy quality can later be compared by effort.
+    assert {item.ai_metadata["reasoning_effort"] for item in items} == {"medium"}
+
+
+async def test_without_a_choice_the_configured_effort_applies(db_session) -> None:
+    llm = SlowLLM(delay=0.01)
+    service = ContentGenerationService(
+        db_session, llm, make_settings(openai_reasoning_effort="low")
+    )
+
+    _, items, _ = await service.generate(_request(["facebook"]), actor_id=uuid.uuid4())
+
+    assert llm.efforts == []  # the client is used exactly as configured
+    assert {item.ai_metadata["reasoning_effort"] for item in items} == {"low"}
+
+
 async def test_each_generation_logs_how_long_it_took(db_session, caplog) -> None:
     service = ContentGenerationService(db_session, SlowLLM(delay=0.01), make_settings())
 

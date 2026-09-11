@@ -4,10 +4,16 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
 from app.db.enums import ContentPlatform
+
+# The speeds the Generate screen offers (docs/GENERATION-LATENCY-PLAN.md).
+# "high" is deliberately absent: at three platforms it could run up to the
+# request deadline, which is exactly the wait this setting exists to avoid.
+OfferedReasoningEffort = Literal["minimal", "low", "medium"]
 
 
 class GenerateContentRequest(BaseModel):
@@ -16,6 +22,9 @@ class GenerateContentRequest(BaseModel):
     notes: str | None = Field(default=None, max_length=2000)
     course_id: uuid.UUID | None = None
     platforms: list[ContentPlatform] = Field(min_length=1)
+    # Speed against copy quality, chosen per generation. None keeps the
+    # server's OPENAI_REASONING_EFFORT.
+    reasoning_effort: OfferedReasoningEffort | None = None
 
     @model_validator(mode="after")
     def _require_grounding(self) -> GenerateContentRequest:

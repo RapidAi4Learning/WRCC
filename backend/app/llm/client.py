@@ -9,6 +9,7 @@ and stable tests (D3: mock-first, LLM_MOCK=true by default).
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
 import re
 from collections.abc import Awaitable, Callable
@@ -60,6 +61,13 @@ class LLMClient(Protocol):
 
     async def suggest_image_prompts(self, context: dict) -> list[str]: ...
 
+    def with_reasoning_effort(self, effort: str | None) -> LLMClient:
+        """A client that thinks ``effort`` hard; this one is left unchanged.
+
+        Providers without the concept return themselves.
+        """
+        ...
+
 
 _WORD_RE = re.compile(r"[A-Za-z]{3,}")
 
@@ -91,6 +99,9 @@ def _hashtagify(text: str) -> str:
 
 class MockLLMClient:
     """Deterministic offline LLM used when LLM_MOCK is enabled."""
+
+    def with_reasoning_effort(self, effort: str | None) -> MockLLMClient:
+        return self  # nothing to think about offline
 
     async def generate_social_post(self, context: dict) -> SocialPostDraft:
         course = context.get("course") or {}
@@ -298,6 +309,10 @@ class GeminiLLMClient:
         self._model = settings.gemini_model
         self._attempts = settings.llm_max_attempts
 
+    def with_reasoning_effort(self, effort: str | None) -> GeminiLLMClient:
+        # Gemini's thinking budget is a different knob; not wired up.
+        return self
+
     async def generate_social_post(self, context: dict) -> SocialPostDraft:
         prompt = _render_prompt(context)
 
@@ -352,15 +367,27 @@ class OpenAILLMClient:
         self._attempts = settings.llm_max_attempts
         # Reasoning effort is the main latency lever (docs/GENERATION-LATENCY-
         # PLAN.md): ~23 s per post at the model's default against ~7 s at "low".
+        self._request_options = self._options_for(settings.openai_reasoning_effort)
+
+    def _options_for(self, effort: str | None) -> dict[str, Any]:
         # Absent rather than sent empty: the key is left out entirely for models
         # that would reject it. Typed Any because the SDK's overloads type every
         # keyword individually.
-        effort = settings.openai_reasoning_effort
-        self._request_options: dict[str, Any] = (
-            {"reasoning_effort": effort}
-            if effort and supports_reasoning_effort(self._model)
-            else {}
-        )
+        if effort and supports_reasoning_effort(self._model):
+            return {"reasoning_effort": effort}
+        return {}
+
+    def with_reasoning_effort(self, effort: str | None) -> OpenAILLMClient:
+        """A copy using ``effort`` for its requests; this client is unchanged.
+
+        The copy shares the underlying HTTP client — only its request options
+        differ — so one person's choice never leaks into another's request.
+        """
+        if effort is None:
+            return self
+        chosen = copy.copy(self)
+        chosen._request_options = self._options_for(effort)
+        return chosen
 
     async def generate_social_post(self, context: dict) -> SocialPostDraft:
         # JSON mode has no schema enforcement, so the shape is spelled out in
