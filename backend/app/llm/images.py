@@ -69,7 +69,14 @@ class OpenAIImageClient:
     def __init__(self, settings: Settings) -> None:
         from openai import AsyncOpenAI
 
-        self._client = AsyncOpenAI(api_key=settings.openai_api_key)
+        # Bounded, and with the SDK's own retries off: an image takes tens of
+        # seconds, so anything beyond one bounded attempt would run past the
+        # host's ~120 s request limit and surface as a 502.
+        self._client = AsyncOpenAI(
+            api_key=settings.openai_api_key,
+            timeout=settings.image_timeout_seconds,
+            max_retries=0,
+        )
         self._model = settings.image_model
         self._size = settings.image_size
         self._quality = settings.image_quality
@@ -89,7 +96,7 @@ class OpenAIImageClient:
             return base64.b64decode(payload)
 
         try:
-            return await generate_with_retries("OpenAI image", attempt_once)
+            return await generate_with_retries("OpenAI image", attempt_once, attempts=1)
         except ImageGenerationError:
             raise
         except Exception as exc:
