@@ -189,7 +189,41 @@ anteriores.
 | Cancelar por el tope deja trabajo a medias | Nada se escribe en la base hasta que terminan todas las llamadas |
 | Coste | Baja: con `low` se generan ~4 veces menos tokens de salida por post que con `medium` |
 
-## 6. Estimación
+## 6. Registro de ejecución (2026-09-11)
+
+Rama `fix/generation-latency`, un commit por fase:
+
+| Fase | Commit | Resultado |
+|---|---|---|
+| 0 | `3ede0e8` | La suite ya no depende del `.env` local: 525/525 sin variables extra |
+| 1 | `14f54c4` | 6 ajustes nuevos con validación (deadline < 115 s) |
+| 2 | `b73fcc5` | Timeouts, un solo nivel de reintentos, `reasoning_effort` solo para modelos de razonamiento, imágenes con 1 intento |
+| 3 | `1230cbd` | Plataformas y variantes en paralelo (`TaskGroup`), semáforo, tope global, nada se guarda si se corta, log por generación |
+| 4 | `71829fe` | Prompt sin curso: sin fecha/lugar ni código acreditado |
+| 5 | `ac19c4b` | 503 legibles; las imágenes ya no responden 502 |
+
+**Verificación:**
+- Backend: **567 tests** en verde (525 + 42 nuevos); `ruff` y `mypy` limpios (67 archivos).
+- E2E contra la **API real de OpenAI** (app completa por HTTP, base de datos en
+  memoria, nada publicado):
+
+  | Caso | Antes (estimado: llamada medida × 9, en serie) | Ahora (medido) |
+  |---|---|---|
+  | Topic libre, 3 plataformas | ~200 s → 502 | **13,2 s** |
+  | Con curso, 3 plataformas | ~400 s → 502 | **18,0 s** |
+  | Regenerar un post | ~23 s (1 llamada) | 7,1 s |
+  | Sugerencias de imagen | ~23 s (1 llamada) | 12,0 s |
+
+  18 posts completos (3 por plataforma), 1 sola infracción de regla en 18,
+  sin datos de curso en el contexto del topic libre y con la línea de log.
+- Frontend: suite Playwright completa (smoke, regresión visual, axe) + un test
+  nuevo que comprueba que el mensaje del 503 llega a la pantalla y el
+  formulario queda usable.
+
+**Pendiente:** desplegar en FastComet (paso 3 de la fase 6) y comprobarlo en
+producción. Requiere acceso a cPanel.
+
+## 7. Estimación
 
 ~5 h en total. Ninguna fase depende de un servicio externo excepto la
 verificación real de la fase 6.
