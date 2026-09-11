@@ -343,6 +343,41 @@ Settings muestra la marca de cada red; en móvil, History y Catalog dan su
 propia línea al título en vez de cortarlo. Tests: los dos de Settings que
 espiaban `window.confirm` pasan a usar el diálogo; +10 tests nuevos (208).
 
+**Fase 6 — hecha.** Tres specs nuevos, todos contra la API simulada y con
+reloj fijo (`page.clock` + `FIXED_NOW`), así que son deterministas:
+- `e2e/ui.spec.ts`: ninguna de las 9 pantallas se desplaza de lado a 320,
+  375, 768, 1024, 1440 ni 1920 px, y a 375/1440 cada una coincide con su
+  captura versionada (`e2e/__snapshots__/`, 18 archivos, ~2,5 MB). Tras un
+  cambio visual intencionado: `npx playwright test ui --update-snapshots`.
+- `e2e/a11y.spec.ts`: axe-core (WCAG 2.2 A + AA) en todas las pantallas, a
+  375 y 1440 — **0 violaciones**.
+- `e2e/support/screens.ts`: la tabla de pantallas que comparten los tres
+  specs (y `visual.spec.ts`, que ahora captura a seis anchos).
+
+Lo que encontró la auditoría y se corrigió:
+- Contraste: el azul de Facebook como texto (4,2:1) y dentro de su badge
+  translúcido (hasta 4,2:1 sobre lima), el rosa de Instagram en su badge, el
+  placeholder (2,9:1), los bordes de los campos (1,3:1; un campo solo se
+  identifica por su borde) y el borde lima del chip seleccionado (2,1:1).
+  Solución: tokens `--color-*-ink` para texto de red, `--color-border-input`,
+  `--color-cta-border`, placeholder más oscuro. Las marcas y tintes siguen en
+  el color de marca.
+- "Skip all" estaba dentro del `<summary>` de cada sección del SyncReview
+  (control anidado en control): ahora va al lado, fuera del `<details>`, con
+  `aria-describedby` al título de su sección.
+- La tabla de fechas del catálogo se desplaza de lado en móvil y no era
+  alcanzable por teclado: ahora es una región con nombre y `tabIndex`.
+
+Rendimiento (build de producción, `/login`, mediana de 3): CLS 0,000 · LCP
+108 ms · FCP 36 ms · 111 KB de JS comprimido. Medido con el Chromium de
+Playwright en lugar de Lighthouse.
+
+Totales al cierre: 208 tests unitarios, 76 e2e (4 smoke + 18 a11y + 54 ui),
+`tsc` y `next build` limpios.
+
+**Pendiente, fuera del alcance de este plan:** el SVG oficial del logo y la
+tagline "Skills for a Stronger Community" (hay que pedírselos al college).
+
 ## 6. Estimación
 
 | Fase | Días |
