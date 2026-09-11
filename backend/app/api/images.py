@@ -96,6 +96,12 @@ def _selection_out(row: ContentItemMedia) -> ItemMediaOut:
 
 
 _NOT_FOUND = status.HTTP_404_NOT_FOUND
+# 503, not 502: a 502 is what the production host answers when it kills a
+# request, and an AI failure must not look like the server falling over.
+_AI_UNAVAILABLE = status.HTTP_503_SERVICE_UNAVAILABLE
+SUGGESTIONS_UNAVAILABLE_DETAIL = (
+    "The AI could not suggest image prompts right now. Please try again in a minute."
+)
 
 
 # ── generate ──
@@ -112,7 +118,7 @@ async def suggest_image_prompts(
         raise HTTPException(status_code=_NOT_FOUND, detail=str(exc)) from exc
     except LLMError as exc:
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
+            status_code=_AI_UNAVAILABLE, detail=SUGGESTIONS_UNAVAILABLE_DETAIL
         ) from exc
     return ImageSuggestionsResponse(prompts=prompts)
 
@@ -129,9 +135,9 @@ async def generate_image(
     except ContentItemNotFoundError as exc:
         raise HTTPException(status_code=_NOT_FOUND, detail=str(exc)) from exc
     except ImageGenerationError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
-        ) from exc
+        # The message is written for the person (see app.llm.images), and a
+        # configuration problem names the setting to fix, so it goes out as-is.
+        raise HTTPException(status_code=_AI_UNAVAILABLE, detail=str(exc)) from exc
     return _asset_out(asset)
 
 

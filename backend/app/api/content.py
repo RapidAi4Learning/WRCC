@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -23,16 +24,40 @@ from app.content.service import (
     ContentItemNotFoundError,
     ContentWorkflowService,
     CourseNotFoundError,
+    GenerationTimeoutError,
 )
 from app.content.state import ContentTransitionError
 from app.db.base import get_session
 from app.db.enums import ContentPlatform, ContentStatus
 from app.db.models import ContentItem, User
-from app.llm.client import LLMClient, get_llm_client
+from app.llm.client import LLMClient, LLMError, get_llm_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/content", tags=["content"], dependencies=[Depends(get_current_user)]
 )
+
+# Shown to the person as-is by the frontend. Always 503, never 502: a 502 is
+# what the production host answers when it kills a request, and "the AI failed"
+# must not be mistaken for "the server fell over".
+AI_UNAVAILABLE_DETAIL = (
+    "The AI could not write the posts right now. Please try again in a minute."
+)
+AI_TIMEOUT_DETAIL = (
+    "The AI took too long to answer. Try again, or generate for fewer platforms."
+)
+
+
+def _ai_failure(exc: LLMError | GenerationTimeoutError) -> HTTPException:
+    """The 503 for an AI call that failed or ran past the deadline."""
+    # The detail sent to the browser is generic by design; the cause goes to
+    # the server log, where it can be read without exposing provider errors.
+    logger.warning("AI generation failed: %s", exc)
+    detail = (
+        AI_TIMEOUT_DETAIL if isinstance(exc, GenerationTimeoutError) else AI_UNAVAILABLE_DETAIL
+    )
+    return HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=detail)
 
 
 def get_llm(settings: Settings = Depends(get_settings)) -> LLMClient:
@@ -71,13 +96,15 @@ def _item_out(item: ContentItem) -> ContentItemOut:
 
 
 async def _call(method, item_id: uuid.UUID, **kwargs) -> ContentItem:
-    """Map service errors to clean HTTP statuses (404 / 409)."""
+    """Map service errors to clean HTTP statuses (404 / 409 / 503)."""
     try:
         return await method(item_id, **kwargs)
     except ContentItemNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ContentTransitionError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except (LLMError, GenerationTimeoutError) as exc:
+        raise _ai_failure(exc) from exc
 
 
 @router.post("/generate", response_model=GenerateContentResponse)
@@ -93,6 +120,8 @@ async def generate_content(
         group, items, warnings = await service.generate(body, actor_id=user.id)
     except CourseNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (LLMError, GenerationTimeoutError) as exc:
+        raise _ai_failure(exc) from exc
     return GenerateContentResponse(
         generation_group=str(group),
         items=[_item_out(item) for item in items],

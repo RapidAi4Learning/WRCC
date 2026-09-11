@@ -9,10 +9,11 @@ and stable tests (D3: mock-first, LLM_MOCK=true by default).
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
 import re
 from collections.abc import Awaitable, Callable
-from typing import Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -20,8 +21,18 @@ from app.config import Settings
 
 logger = logging.getLogger(__name__)
 
-_RETRY_ATTEMPTS = 3
+# Ours is the only retry layer: the SDKs' own retries are switched off, so the
+# two cannot multiply. Live clients pass Settings.llm_max_attempts.
+DEFAULT_ATTEMPTS = 2
 _RETRY_BACKOFF_SECONDS = 0.5
+
+# OpenAI model families that accept `reasoning_effort`. Every other model
+# answers 400 "Unsupported parameter", so the effort is only sent to these.
+_REASONING_MODEL_PREFIXES = ("gpt-5", "o1", "o3", "o4")
+
+
+def supports_reasoning_effort(model: str) -> bool:
+    return model.startswith(_REASONING_MODEL_PREFIXES)
 
 
 class LLMError(RuntimeError):
@@ -49,6 +60,13 @@ class LLMClient(Protocol):
     async def generate_social_post(self, context: dict) -> SocialPostDraft: ...
 
     async def suggest_image_prompts(self, context: dict) -> list[str]: ...
+
+    def with_reasoning_effort(self, effort: str | None) -> LLMClient:
+        """A client that thinks ``effort`` hard; this one is left unchanged.
+
+        Providers without the concept return themselves.
+        """
+        ...
 
 
 _WORD_RE = re.compile(r"[A-Za-z]{3,}")
@@ -81,6 +99,9 @@ def _hashtagify(text: str) -> str:
 
 class MockLLMClient:
     """Deterministic offline LLM used when LLM_MOCK is enabled."""
+
+    def with_reasoning_effort(self, effort: str | None) -> MockLLMClient:
+        return self  # nothing to think about offline
 
     async def generate_social_post(self, context: dict) -> SocialPostDraft:
         course = context.get("course") or {}
@@ -202,13 +223,21 @@ def render_image_suggestions_prompt(context: dict) -> str:
 def _render_prompt(context: dict) -> str:
     """Render the shared generation context as the live-model prompt."""
     profile = context.get("platform_profile") or {}
+    has_course = bool(context.get("course"))
+    # A course-less post must not be asked for course facts (a date, a
+    # location, an accredited code) that the next line forbids inventing.
+    structure = (
+        profile.get("structure")
+        if has_course
+        else profile.get("structure_without_course", profile.get("structure"))
+    )
     lines = [
         "You are the social media copywriter for Western Riverina Community "
         "College (WRCC), a community college in the NSW Riverina.",
         f"Write ONE {context.get('platform')} post.",
         f"Angle for this variant: {context.get('variant_style')}.",
         f"Tone: {profile.get('tone')}.",
-        f"Structure: {profile.get('structure')}.",
+        f"Structure: {structure}.",
         f"Body length: between {profile.get('min_length')} and "
         f"{profile.get('max_length')} characters.",
         f"Hashtags: between {profile.get('hashtags_min')} and "
@@ -233,6 +262,10 @@ def _render_prompt(context: dict) -> str:
     lines.append(
         "Never invent prices, dates or accreditation claims — only use the "
         "course data provided."
+        if has_course
+        else "No course data is provided: do not state prices, dates, locations, "
+        "course codes or accreditation unless they appear in the topic, notes or "
+        "reference material above."
     )
     return "\n".join(lines)
 
@@ -241,19 +274,20 @@ T = TypeVar("T")
 
 
 async def generate_with_retries(
-    label: str, attempt_once: Callable[[], Awaitable[T]]
+    label: str,
+    attempt_once: Callable[[], Awaitable[T]],
+    *,
+    attempts: int = DEFAULT_ATTEMPTS,
 ) -> T:
-    """Run one provider attempt with bounded retries and linear backoff."""
+    """Run one provider attempt, retrying up to ``attempts`` tries in total."""
     last_error: Exception | None = None
-    for attempt in range(1, _RETRY_ATTEMPTS + 1):
+    for attempt in range(1, attempts + 1):
         try:
             return await attempt_once()
         except Exception as exc:  # noqa: BLE001
             last_error = exc
-            logger.warning(
-                "%s attempt %d/%d failed: %s", label, attempt, _RETRY_ATTEMPTS, exc
-            )
-            if attempt < _RETRY_ATTEMPTS:
+            logger.warning("%s attempt %d/%d failed: %s", label, attempt, attempts, exc)
+            if attempt < attempts:
                 await asyncio.sleep(_RETRY_BACKOFF_SECONDS * attempt)
     raise LLMError("AI generation failed after retries.") from last_error
 
@@ -263,9 +297,21 @@ class GeminiLLMClient:
 
     def __init__(self, settings: Settings) -> None:
         from google import genai
+        from google.genai import types
 
-        self._client = genai.Client(api_key=settings.gemini_api_key)
+        # Bounded like the OpenAI client; google-genai takes milliseconds.
+        self._client = genai.Client(
+            api_key=settings.gemini_api_key,
+            http_options=types.HttpOptions(
+                timeout=round(settings.llm_timeout_seconds * 1000)
+            ),
+        )
         self._model = settings.gemini_model
+        self._attempts = settings.llm_max_attempts
+
+    def with_reasoning_effort(self, effort: str | None) -> GeminiLLMClient:
+        # Gemini's thinking budget is a different knob; not wired up.
+        return self
 
     async def generate_social_post(self, context: dict) -> SocialPostDraft:
         prompt = _render_prompt(context)
@@ -281,7 +327,7 @@ class GeminiLLMClient:
             )
             return SocialPostDraft.model_validate_json(response.text or "")
 
-        return await generate_with_retries("Gemini", attempt_once)
+        return await generate_with_retries("Gemini", attempt_once, attempts=self._attempts)
 
     async def suggest_image_prompts(self, context: dict) -> list[str]:
         prompt = render_image_suggestions_prompt(context)
@@ -298,7 +344,9 @@ class GeminiLLMClient:
             ideas = ImagePromptIdeas.model_validate_json(response.text or "")
             return ideas.prompts[:IMAGE_SUGGESTION_COUNT]
 
-        return await generate_with_retries("Gemini image prompts", attempt_once)
+        return await generate_with_retries(
+            "Gemini image prompts", attempt_once, attempts=self._attempts
+        )
 
 
 class OpenAILLMClient:
@@ -307,8 +355,39 @@ class OpenAILLMClient:
     def __init__(self, settings: Settings) -> None:
         from openai import AsyncOpenAI
 
-        self._client = AsyncOpenAI(api_key=settings.openai_api_key)
+        # Left at its defaults the SDK waits up to 600 s per call and retries
+        # twice inside each of our attempts — one slow call could hold the
+        # request far past the host's ~120 s limit.
+        self._client = AsyncOpenAI(
+            api_key=settings.openai_api_key,
+            timeout=settings.llm_timeout_seconds,
+            max_retries=0,
+        )
         self._model = settings.openai_model
+        self._attempts = settings.llm_max_attempts
+        # Reasoning effort is the main latency lever (docs/GENERATION-LATENCY-
+        # PLAN.md): ~23 s per post at the model's default against ~7 s at "low".
+        self._request_options = self._options_for(settings.openai_reasoning_effort)
+
+    def _options_for(self, effort: str | None) -> dict[str, Any]:
+        # Absent rather than sent empty: the key is left out entirely for models
+        # that would reject it. Typed Any because the SDK's overloads type every
+        # keyword individually.
+        if effort and supports_reasoning_effort(self._model):
+            return {"reasoning_effort": effort}
+        return {}
+
+    def with_reasoning_effort(self, effort: str | None) -> OpenAILLMClient:
+        """A copy using ``effort`` for its requests; this client is unchanged.
+
+        The copy shares the underlying HTTP client — only its request options
+        differ — so one person's choice never leaks into another's request.
+        """
+        if effort is None:
+            return self
+        chosen = copy.copy(self)
+        chosen._request_options = self._options_for(effort)
+        return chosen
 
     async def generate_social_post(self, context: dict) -> SocialPostDraft:
         # JSON mode has no schema enforcement, so the shape is spelled out in
@@ -324,11 +403,12 @@ class OpenAILLMClient:
                 model=self._model,
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
+                **self._request_options,
             )
             content = response.choices[0].message.content or ""
             return SocialPostDraft.model_validate_json(content)
 
-        return await generate_with_retries("OpenAI", attempt_once)
+        return await generate_with_retries("OpenAI", attempt_once, attempts=self._attempts)
 
     async def suggest_image_prompts(self, context: dict) -> list[str]:
         prompt = render_image_suggestions_prompt(context) + (
@@ -341,12 +421,15 @@ class OpenAILLMClient:
                 model=self._model,
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
+                **self._request_options,
             )
             content = response.choices[0].message.content or ""
             ideas = ImagePromptIdeas.model_validate_json(content)
             return ideas.prompts[:IMAGE_SUGGESTION_COUNT]
 
-        return await generate_with_retries("OpenAI image prompts", attempt_once)
+        return await generate_with_retries(
+            "OpenAI image prompts", attempt_once, attempts=self._attempts
+        )
 
 
 def get_llm_client(settings: Settings) -> LLMClient:

@@ -10,12 +10,18 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AppEnv = Literal["local", "staging", "production"]
+ReasoningEffort = Literal["", "minimal", "low", "medium", "high"]
 
 _AUTH_SECRET_PLACEHOLDER = "change-me-32-bytes-min"
+
+# The production host (LiteSpeed on FastComet) kills a request at ~120 s and
+# answers 502. Anything that bounds a whole request stays under this, so the app
+# always answers first — with a message — instead of the proxy.
+PROXY_REQUEST_LIMIT_SECONDS = 115
 
 
 class Settings(BaseSettings):
@@ -82,6 +88,25 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-5-mini"
 
+    # ── LLM latency (docs/GENERATION-LATENCY-PLAN.md) ──
+    # How much a reasoning model (gpt-5 family) thinks before answering. The
+    # model's own default is "medium", measured at ~23 s per post against ~7 s
+    # for "low" with near-identical copy. Blank sends nothing; it is only ever
+    # sent to reasoning models, so switching OPENAI_MODEL cannot break a call.
+    openai_reasoning_effort: ReasoningEffort = "low"
+    # Per provider call. The SDK default is 600 s — far past the proxy limit.
+    llm_timeout_seconds: float = Field(default=40.0, gt=0)
+    # Total tries per call, ours only: the SDK's own retries are switched off
+    # so the two layers cannot multiply.
+    llm_max_attempts: int = Field(default=2, ge=1, le=3)
+    # Calls in flight at once for one generation (3 platforms x 3 variants).
+    # Lower it if the provider account starts answering 429.
+    llm_max_concurrency: int = Field(default=9, ge=1, le=20)
+    # Hard ceiling for a whole generation or regeneration request.
+    generation_deadline_seconds: float = Field(
+        default=95.0, gt=0, lt=PROXY_REQUEST_LIMIT_SECONDS
+    )
+
     @property
     def live_model_name(self) -> str:
         """Model recorded in ai_metadata when LLM_MOCK=false."""
@@ -93,6 +118,11 @@ class Settings(BaseSettings):
     image_model: str = "gpt-image-1"
     image_size: str = "1024x1024"
     image_quality: Literal["low", "medium", "high", "auto"] = "medium"
+    # One attempt, bounded: an image takes tens of seconds, so a retry after a
+    # timeout would itself run past the proxy limit.
+    image_timeout_seconds: float = Field(
+        default=100.0, gt=0, lt=PROXY_REQUEST_LIMIT_SECONDS
+    )
 
     # ── Uploaded media (D10 — normalised at ingest, see app/content/ingest.py) ──
     media_upload_max_bytes: int = 10 * 1024 * 1024

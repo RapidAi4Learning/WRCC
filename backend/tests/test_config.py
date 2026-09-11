@@ -62,6 +62,52 @@ def test_live_model_name_follows_provider() -> None:
     assert settings.live_model_name == "gpt-5-mini"
 
 
+def test_latency_limits_have_safe_defaults() -> None:
+    # docs/GENERATION-LATENCY-PLAN.md: a whole generation must finish well
+    # inside the ~120 s after which the host kills the request with a 502.
+    settings = make_settings()
+    assert settings.openai_reasoning_effort == "low"
+    assert settings.llm_timeout_seconds == 40
+    assert settings.llm_max_attempts == 2
+    assert settings.llm_max_concurrency == 9
+    assert settings.generation_deadline_seconds == 95
+    assert settings.image_timeout_seconds == 100
+
+
+@pytest.mark.parametrize("effort", ["", "minimal", "low", "medium", "high"])
+def test_reasoning_effort_accepts_blank_and_known_levels(effort: str) -> None:
+    assert make_settings(openai_reasoning_effort=effort).openai_reasoning_effort == effort
+
+
+def test_reasoning_effort_rejects_unknown_level() -> None:
+    with pytest.raises(ValueError):
+        make_settings(openai_reasoning_effort="turbo")
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("llm_timeout_seconds", 0),
+        ("llm_max_attempts", 0),
+        ("llm_max_attempts", 4),
+        ("llm_max_concurrency", 0),
+        ("llm_max_concurrency", 21),
+        ("generation_deadline_seconds", 0),
+        ("image_timeout_seconds", 0),
+    ],
+)
+def test_latency_limits_reject_out_of_range(field: str, value: float) -> None:
+    with pytest.raises(ValueError):
+        make_settings(**{field: value})
+
+
+@pytest.mark.parametrize("field", ["generation_deadline_seconds", "image_timeout_seconds"])
+def test_request_deadlines_stay_under_the_proxy_limit(field: str) -> None:
+    # 115 s leaves a margin under LiteSpeed's ~120 s: we must answer first.
+    with pytest.raises(ValueError, match="115"):
+        make_settings(**{field: 115})
+
+
 def test_production_rejects_placeholder_auth_secret() -> None:
     with pytest.raises(ValueError, match="AUTH_SECRET"):
         make_settings(app_env="production", auth_secret="change-me-32-bytes-min")

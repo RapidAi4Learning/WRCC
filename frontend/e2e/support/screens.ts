@@ -16,10 +16,19 @@ export interface Screen {
   open: (page: Page) => Promise<void>;
 }
 
+/** Tick a platform chip the way a person does: by clicking the chip itself.
+ *  Playwright then scrolls it into view and checks nothing covers it — the
+ *  Generate bar is pinned to the window's bottom edge and can overlap it. */
+export async function choosePlatform(page: Page, name: string): Promise<void> {
+  const checkbox = page.getByRole("checkbox", { name });
+  await page.locator("label").filter({ has: checkbox }).click();
+  await expect(checkbox).toBeChecked();
+}
+
 async function openGenerated(page: Page) {
   await page.goto("/generate");
   await page.locator("#topic").fill("Spring first aid enrolments in Griffith");
-  await page.getByRole("checkbox", { name: "Instagram" }).check({ force: true });
+  await choosePlatform(page, "Instagram");
   await page.getByRole("button", { name: /Generate 3 ideas/ }).click();
   await expect(page.getByText(/Spring is here/).first()).toBeVisible();
 }

@@ -31,12 +31,18 @@ export interface ContentItem {
   reviewed_at: string | null;
 }
 
+// Speed against copy quality for one generation. The server accepts exactly
+// these; "high" is not offered (see docs/GENERATION-LATENCY-PLAN.md).
+export type ReasoningEffort = "minimal" | "low" | "medium";
+
 export interface GenerateContentInput {
   topic?: string;
   reference_url?: string;
   notes?: string;
   course_id?: string;
   platforms: Platform[];
+  // Absent keeps the server's OPENAI_REASONING_EFFORT.
+  reasoning_effort?: ReasoningEffort;
 }
 
 export interface GenerateContentResult {

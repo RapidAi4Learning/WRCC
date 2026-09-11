@@ -3,7 +3,7 @@
 // Compose screen: ground the generation in a real course OR a free topic
 // (+ optional reference URL and notes), pick platforms, get 3 ideas each.
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { generateContent } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
@@ -12,6 +12,7 @@ import type {
   ContentItem,
   GenerateContentResult,
   Platform,
+  ReasoningEffort,
 } from "@/types/content";
 import type { Course } from "@/types/course";
 import CoursePicker from "@/components/content/CoursePicker";
@@ -26,6 +27,7 @@ import {
   Field,
   PageHeader,
   SectionLabel,
+  SegmentedControl,
   Skeleton,
   Tab,
   TabList,
@@ -38,6 +40,23 @@ import styles from "./generate.module.css";
 
 const VARIANTS_PER_PLATFORM = 3;
 
+// Speed against copy quality, remembered per device. The times are what a
+// three-platform generation measured against the live API
+// (docs/GENERATION-LATENCY-PLAN.md): Fast 9 s, Balanced 10–18 s, Best quality
+// 27 s without a course — with a course its calls take about twice as long,
+// hence the range.
+const SPEED_STORAGE_KEY = "wrcc.generate.speed";
+const DEFAULT_SPEED: ReasoningEffort = "low";
+const SPEEDS: ReadonlyArray<{ value: ReasoningEffort; label: string; hint: string }> = [
+  { value: "minimal", label: "Fast", hint: "~10 s" },
+  { value: "low", label: "Balanced", hint: "~15 s" },
+  { value: "medium", label: "Best quality", hint: "30–60 s" },
+];
+
+function isOfferedSpeed(value: string | null): value is ReasoningEffort {
+  return SPEEDS.some((speed) => speed.value === value);
+}
+
 export default function GeneratePage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [topic, setTopic] = useState("");
@@ -48,6 +67,28 @@ export default function GeneratePage() {
   const [activePlatform, setActivePlatform] = useState<Platform | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [speed, setSpeed] = useState<ReasoningEffort>(DEFAULT_SPEED);
+
+  // Read after mount rather than in the initial state: the page is prerendered
+  // on the server, where there is no storage, and a first browser render that
+  // differed from it would not hydrate.
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(SPEED_STORAGE_KEY);
+      if (isOfferedSpeed(stored)) setSpeed(stored);
+    } catch {
+      // Storage blocked (private mode, site data off): keep the default.
+    }
+  }, []);
+
+  function chooseSpeed(next: ReasoningEffort) {
+    setSpeed(next);
+    try {
+      window.localStorage.setItem(SPEED_STORAGE_KEY, next);
+    } catch {
+      // Not remembered this time; the choice still applies to this page.
+    }
+  }
 
   const canSubmit =
     platforms.length > 0 && (course !== null || topic.trim().length > 0);
@@ -72,6 +113,7 @@ export default function GeneratePage() {
         notes: notes.trim() || undefined,
         course_id: course?.id,
         platforms,
+        reasoning_effort: speed,
       });
       setResult(generated);
       setActivePlatform(generated.items[0]?.platform ?? null);
@@ -260,22 +302,34 @@ export default function GeneratePage() {
             </div>
           </fieldset>
 
+          <SegmentedControl
+            label="Writing speed"
+            name="speed"
+            value={speed}
+            options={SPEEDS}
+            onChange={chooseSpeed}
+          />
+
           {error ? (
             <Callout tone="danger" role="alert">
               {error}
             </Callout>
           ) : null}
 
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            block
-            icon={<Sparkles size={22} />}
-            disabled={!canSubmit || isGenerating}
-          >
-            {isGenerating ? "Generating…" : "Generate 3 ideas per platform"}
-          </Button>
+          {/* Pinned to the bottom of the window while the form is longer than
+              it, so the one action on this screen is visible at any height. */}
+          <div className={styles.submitBar}>
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              block
+              icon={<Sparkles size={22} />}
+              disabled={!canSubmit || isGenerating}
+            >
+              {isGenerating ? "Generating…" : "Generate 3 ideas per platform"}
+            </Button>
+          </div>
         </form>
 
         <section className={styles.results} aria-label="Generated variants">

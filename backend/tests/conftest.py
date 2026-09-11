@@ -7,6 +7,7 @@ layer works on Postgres in production.
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -20,11 +21,18 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import StaticPool
 
-from app.auth.rate_limit import get_rate_limiter
-from app.config import Settings, get_settings
-from app.db import models  # noqa: F401 - registers tables on Base.metadata
-from app.db.base import Base, get_session
-from app.main import create_app
+# Must run before `app` is imported. app/main.py builds the application at
+# import time, which reads backend/.env — and a developer .env that points at
+# production (APP_ENV=production) fails config validation before a single test
+# is collected. The suite pins the environment it was written for; explicit
+# Settings(...) arguments in individual tests still override it.
+os.environ["APP_ENV"] = "local"
+
+from app.auth.rate_limit import get_rate_limiter  # noqa: E402
+from app.config import Settings, get_settings  # noqa: E402
+from app.db import models  # noqa: E402,F401 - registers tables on Base.metadata
+from app.db.base import Base, get_session  # noqa: E402
+from app.main import create_app  # noqa: E402
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

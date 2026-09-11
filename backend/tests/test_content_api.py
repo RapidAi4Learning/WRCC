@@ -110,6 +110,31 @@ async def test_generate_grounded_in_real_course(
     assert context_course["upcoming_offerings"][0]["price"] == 185.0
 
 
+@pytest.mark.parametrize("effort", ["minimal", "low", "medium"])
+async def test_generate_accepts_each_offered_speed(
+    auth_client: AsyncClient, effort: str
+) -> None:
+    response = await auth_client.post(
+        "/api/content/generate",
+        json={"topic": "Yoga term 3", "platforms": ["facebook"], "reasoning_effort": effort},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["items"][0]["ai_metadata"]["reasoning_effort"] == effort
+
+
+@pytest.mark.parametrize("effort", ["high", "turbo", ""])
+async def test_generate_rejects_a_speed_that_is_not_offered(
+    auth_client: AsyncClient, effort: str
+) -> None:
+    # "high" is deliberately not offered: at three platforms it could run up
+    # to the request deadline.
+    response = await auth_client.post(
+        "/api/content/generate",
+        json={"topic": "Yoga term 3", "platforms": ["facebook"], "reasoning_effort": effort},
+    )
+    assert response.status_code == 422
+
+
 async def test_generate_unknown_course_404(auth_client: AsyncClient) -> None:
     response = await auth_client.post(
         "/api/content/generate",
