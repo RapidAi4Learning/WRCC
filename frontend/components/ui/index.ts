@@ -16,6 +16,8 @@ export { default as IconButton } from "./IconButton";
 export { default as Modal, ModalFooter } from "./Modal";
 export { default as PageHeader } from "./PageHeader";
 export { default as SectionLabel } from "./SectionLabel";
+export { default as SegmentedControl } from "./SegmentedControl";
+export type { SegmentedOption } from "./SegmentedControl";
 export { default as SelectableThumb } from "./SelectableThumb";
 export { default as Skeleton } from "./Skeleton";
 export { Tab, TabList } from "./Tabs";

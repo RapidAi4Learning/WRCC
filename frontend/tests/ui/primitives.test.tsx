@@ -8,6 +8,7 @@ import {
   DisclosureList,
   DisclosureRow,
   Field,
+  SegmentedControl,
   SelectableThumb,
   Tab,
   TabList,
@@ -107,6 +108,45 @@ describe("TabList", () => {
 
     fireEvent.keyDown(instagram, { key: "ArrowRight" });
     expect(facebook).toHaveAttribute("aria-selected", "true");
+  });
+});
+
+describe("SegmentedControl", () => {
+  const OPTIONS = [
+    { value: "fast", label: "Fast", hint: "~5 s" },
+    { value: "slow", label: "Slow", hint: "~45 s" },
+  ] as const;
+
+  it("is a radio group named by its visible label", () => {
+    render(
+      <SegmentedControl
+        label="Writing speed"
+        name="speed"
+        value="fast"
+        options={OPTIONS}
+        onChange={() => {}}
+      />,
+    );
+    const group = screen.getByRole("radiogroup", { name: "Writing speed" });
+    expect(group).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Fast/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Slow/ })).not.toBeChecked();
+    expect(screen.getByText("~45 s")).toBeInTheDocument();
+  });
+
+  it("reports the chosen value", () => {
+    const onChange = vi.fn();
+    render(
+      <SegmentedControl
+        label="Writing speed"
+        name="speed"
+        value="fast"
+        options={OPTIONS}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("radio", { name: /Slow/ }));
+    expect(onChange).toHaveBeenCalledWith("slow");
   });
 });
 

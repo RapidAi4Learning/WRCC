@@ -4,8 +4,7 @@
   gap: var(--space-8);
 }
 
-/* Two-pane workspace: the compose card on the left, results on the right —
-   generating never pushes the output below the fold. */
+/* Two-pane workspace: the compose card on the left, results on the right. */
 .workspace {
   display: grid;
   grid-template-columns: minmax(20rem, 31rem) minmax(0, 1fr);
@@ -13,28 +12,21 @@
   align-items: start;
 }
 
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  /* Stays alongside the results while they scroll (below the app header). */
-  position: sticky;
-  top: calc(var(--header-height) + var(--space-4));
-  max-height: calc(100vh - var(--header-height) - var(--space-8));
-  overflow-y: auto;
-}
-
 @media (max-width: 64rem) {
   .workspace {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-6);
   }
+}
 
-  .form {
-    position: static;
-    max-height: none;
-    overflow-y: visible;
-  }
+/* The form flows with the page. It used to be a sticky card scrolling its own
+   fields, sized as if it were already stuck to the top of the window — which
+   at load it is not, so on a laptop screen its bottom, and the Generate
+   button, sat below the fold. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
 
 .fieldset {
@@ -68,6 +60,23 @@
 
 .platformChip {
   padding: var(--space-3) var(--space-2);
+}
+
+/* While the form is longer than the window, the Generate button stays on the
+   window's bottom edge over a fade; at the end of the form it settles back in
+   place. The negative margins let the bar cover the card's own padding. Kept
+   slim, because while pinned it sits over whatever field is underneath. */
+.submitBar {
+  position: sticky;
+  bottom: 0;
+  margin: 0 calc(-1 * var(--space-6)) calc(-1 * var(--space-6));
+  padding: var(--space-3) var(--space-6) var(--space-4);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0),
+    var(--color-surface-raised) var(--space-4)
+  );
 }
 
 .results {
