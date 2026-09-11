@@ -1,0 +1,32 @@
+# Runtime dependencies for the FastComet deployment.
+#
+# Mirrors [project.dependencies] in pyproject.toml, plus the one thing only
+# this deployment needs. Kept as a flat file because cPanel's "Run Pip Install"
+# button reads requirements.txt and nothing else.
+#
+# If pyproject.toml gains a dependency, add it here too -- there is no import
+# that will fail loudly enough at deploy time to remind you.
+
+fastapi>=0.115
+pydantic>=2.9
+pydantic-settings>=2.6
+sqlalchemy>=2.0.36
+alembic>=1.14
+asyncpg>=0.30
+argon2-cffi>=23.1
+pyjwt>=2.10
+cryptography>=44
+pillow>=11
+python-multipart>=0.0.20
+httpx>=0.27
+beautifulsoup4>=4.12
+google-genai>=1.0
+openai>=1.60
+
+# Passenger speaks WSGI; the application is ASGI. This is the bridge, and it
+# is the only dependency that exists solely because of this host.
+a2wsgi>=1.10
+
+# uvicorn is deliberately absent. It is the server for local development and
+# for the Docker image; here Passenger is the server, and installing a second
+# one would only add weight to a shared account.
