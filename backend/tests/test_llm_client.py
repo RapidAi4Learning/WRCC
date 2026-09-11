@@ -8,14 +8,19 @@ from typing import Any
 
 import pytest
 
+from app.agents.content_generator import build_generation_context
+from app.db.enums import ContentPlatform
 from app.llm.client import (
     GeminiLLMClient,
     LLMError,
     MockLLMClient,
     OpenAILLMClient,
+    _render_prompt,
     get_llm_client,
 )
 from tests.conftest import make_settings
+
+COURSE = {"title": "Provide First Aid", "course_code": "HLTAID011", "price": 185.0}
 
 
 class _StubCompletions:
@@ -156,6 +161,56 @@ async def test_openai_client_raises_llm_error_after_retries(monkeypatch) -> None
         await client.generate_social_post({"platform_profile": {}})
 
     assert len(client._client.chat.completions.calls) == 2
+
+
+# ── Prompt without a course (docs/GENERATION-LATENCY-PLAN.md, phase 4) ──
+
+
+def _prompt(platform: ContentPlatform, *, course: dict | None = None) -> str:
+    return _render_prompt(
+        build_generation_context(
+            platform=platform,
+            variant_style="direct",
+            topic=None if course else "Spring first aid in Griffith",
+            course_facts=course,
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("platform", "course_only_ask"),
+    [
+        (ContentPlatform.facebook, "date/location"),
+        (ContentPlatform.linkedin, "accredited code"),
+    ],
+)
+def test_prompt_without_course_does_not_ask_for_course_facts(
+    platform: ContentPlatform, course_only_ask: str
+) -> None:
+    # Asking for a date or an accredited code while forbidding the model to
+    # invent one is what made it fill the gap ("WRCC Griffith campus").
+    prompt = _prompt(platform)
+
+    assert course_only_ask not in prompt
+    assert "only use the course data provided" not in prompt
+    assert "No course data is provided" in prompt
+
+
+@pytest.mark.parametrize(
+    ("platform", "course_only_ask"),
+    [
+        (ContentPlatform.facebook, "date/location"),
+        (ContentPlatform.linkedin, "accredited code"),
+    ],
+)
+def test_prompt_with_course_is_unchanged(
+    platform: ContentPlatform, course_only_ask: str
+) -> None:
+    prompt = _prompt(platform, course=COURSE)
+
+    assert course_only_ask in prompt
+    assert "only use the course data provided" in prompt
+    assert "No course data is provided" not in prompt
 
 
 # ── Latency bounds (docs/GENERATION-LATENCY-PLAN.md, phase 2) ──

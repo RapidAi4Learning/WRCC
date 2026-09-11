@@ -40,6 +40,9 @@ PLATFORM_PROFILES: dict[str, dict] = {
         "hashtags_max": 5,
         "cta": "Enrol now or upskill your team.",
         "structure": "hook + value + credential (accredited code) + CTA",
+        # Without a course there is no code to cite; asking for one while
+        # forbidding invention makes the model fill the gap.
+        "structure_without_course": "hook + value + CTA",
     },
     ContentPlatform.facebook.value: {
         "tone": "conversational, community-minded",
@@ -49,6 +52,7 @@ PLATFORM_PROFILES: dict[str, dict] = {
         "hashtags_max": 5,
         "cta": "Book your spot.",
         "structure": "hook + benefit + date/location + CTA",
+        "structure_without_course": "hook + benefit + CTA",
     },
     ContentPlatform.instagram.value: {
         "tone": "visual, energetic, emoji-friendly",
@@ -58,6 +62,7 @@ PLATFORM_PROFILES: dict[str, dict] = {
         "hashtags_max": 15,
         "cta": "Link in bio — enrol now.",
         "structure": "short hook + emoji + CTA + hashtag wall",
+        "structure_without_course": "short hook + emoji + CTA + hashtag wall",
     },
 }
 

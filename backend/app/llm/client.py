@@ -212,13 +212,21 @@ def render_image_suggestions_prompt(context: dict) -> str:
 def _render_prompt(context: dict) -> str:
     """Render the shared generation context as the live-model prompt."""
     profile = context.get("platform_profile") or {}
+    has_course = bool(context.get("course"))
+    # A course-less post must not be asked for course facts (a date, a
+    # location, an accredited code) that the next line forbids inventing.
+    structure = (
+        profile.get("structure")
+        if has_course
+        else profile.get("structure_without_course", profile.get("structure"))
+    )
     lines = [
         "You are the social media copywriter for Western Riverina Community "
         "College (WRCC), a community college in the NSW Riverina.",
         f"Write ONE {context.get('platform')} post.",
         f"Angle for this variant: {context.get('variant_style')}.",
         f"Tone: {profile.get('tone')}.",
-        f"Structure: {profile.get('structure')}.",
+        f"Structure: {structure}.",
         f"Body length: between {profile.get('min_length')} and "
         f"{profile.get('max_length')} characters.",
         f"Hashtags: between {profile.get('hashtags_min')} and "
@@ -243,6 +251,10 @@ def _render_prompt(context: dict) -> str:
     lines.append(
         "Never invent prices, dates or accreditation claims — only use the "
         "course data provided."
+        if has_course
+        else "No course data is provided: do not state prices, dates, locations, "
+        "course codes or accreditation unless they appear in the topic, notes or "
+        "reference material above."
     )
     return "\n".join(lines)
 
