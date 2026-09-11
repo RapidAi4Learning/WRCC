@@ -27,6 +27,15 @@ for (const viewport of [
       await expect(
         page.getByRole("button", { name: /Generate 3 ideas/ }),
       ).toBeInViewport({ ratio: 1 });
+
+      // What a person sees on load (the full-page baselines cannot show a
+      // pinned bar). Saved only on a capture run, like e2e/visual.spec.ts.
+      if (process.env.SHOTS_LABEL) {
+        await page.screenshot({
+          path: `e2e/shots/${process.env.SHOTS_LABEL}/generate-on-load-${viewport.width}x${viewport.height}.png`,
+          animations: "disabled",
+        });
+      }
     });
 
     test("every platform chip can still be ticked with the bar pinned", async ({ page }) => {

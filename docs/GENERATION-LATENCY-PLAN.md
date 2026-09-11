@@ -220,6 +220,50 @@ Rama `fix/generation-latency`, un commit por fase:
   nuevo que comprueba que el mensaje del 503 llega a la pantalla y el
   formulario queda usable.
 
+### Seguimiento: velocidad elegida en cada generación (opción A)
+
+Pedido tras la fase 6: que el esfuerzo se elija desde la app y no solo desde
+el `.env`. En Generate, un selector *Writing speed* — **Fast** (`minimal`),
+**Balanced** (`low`, por defecto) y **Best quality** (`medium`) — que viaja
+con cada petición; el `.env` queda como valor por defecto para las peticiones
+que no lo indican (regenerar, sugerencias de imagen, otros clientes de la API).
+
+- El servidor solo acepta esos tres valores (422 para el resto); `high` no se
+  ofrece porque a tres plataformas podría llegar al tope.
+- `LLMClient.with_reasoning_effort()` devuelve una **copia** con otro esfuerzo:
+  la elección de una persona nunca afecta a otra petición.
+- El esfuerzo usado se guarda en `ai_metadata` de cada post y en la línea de
+  log, para poder comparar calidad por velocidad más adelante.
+- La elección se recuerda por navegador (`localStorage`), leída después del
+  montaje para no romper la hidratación.
+- Los timeouts, reintentos, concurrencia y tope siguen solo en el `.env`: son
+  la protección contra el corte del host y no deben tocarse desde la UI.
+
+Medido contra la API real, 3 plataformas sin curso:
+
+| Velocidad | Tiempo | Posts |
+|---|---|---|
+| Fast | 9,2 s | 9/9 |
+| Balanced | 9,8 s | 9/9 |
+| Best quality | 27,2 s | 9/9 |
+
+Con esta concurrencia, **Fast apenas mejora a Balanced**: la sobrecarga de red
+y del paralelo pesa más que el razonamiento. Los textos del selector reflejan
+lo medido (*~10 s*, *~15 s*, *30–60 s*; el tope de Best quality cubre el caso
+con curso, cuyas llamadas tardan el doble).
+
+Diseño: el selector alargó el formulario y el botón *Generate* quedó bajo el
+pliegue a 1440×900 (a 1366×768 ya lo estaba antes). El formulario ya no es
+una tarjeta sticky con scroll propio: fluye con la página y el botón queda
+fijado al borde inferior de la ventana mientras el formulario sea más alto que
+ella. En pantallas bajas la barra tapa los últimos campos hasta hacer scroll;
+a cambio, el formulario ya no acompaña a los resultados al bajar.
+`e2e/generate.spec.ts` comprueba el botón visible al cargar y los chips
+clicables con la barra encima.
+
+Tests: backend 579, frontend 216 unitarios + 136 e2e (axe sin violaciones en
+el selector nuevo).
+
 **Pendiente:** desplegar en FastComet (paso 3 de la fase 6) y comprobarlo en
 producción. Requiere acceso a cPanel.
 
