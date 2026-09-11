@@ -6,15 +6,24 @@ the service layer persists. Each generation pass takes a distinct angle
 (``CONTENT_VARIANT_STYLES``) so the 3 variants per platform genuinely differ,
 and results are ranked by the deterministic rule-baseline violation count —
 no extra LLM call needed to judge them.
+
+The variants are requested concurrently: each one is an independent call of
+tens of seconds, and one after another they ran a generation past the host's
+~120 s request limit (docs/GENERATION-LATENCY-PLAN.md).
 """
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Coroutine, Iterable
 from dataclasses import dataclass
+from typing import Any, TypeVar
 
 from app.agents.validation import validate_generated_content
 from app.db.enums import ContentPlatform
 from app.llm.client import LLMClient
+
+T = TypeVar("T")
 
 CONTENT_VARIANT_STYLES: tuple[str, ...] = ("direct", "story_led", "question_led")
 DEFAULT_VARIANT_COUNT = 3
@@ -95,6 +104,21 @@ def _rank_key(draft: GeneratedDraft) -> tuple[int, int]:
     return (draft.violation_count, -len(draft.body))
 
 
+async def run_all(coroutines: Iterable[Coroutine[Any, Any, T]]) -> list[T]:
+    """Run coroutines concurrently; return their results in the given order.
+
+    Unlike ``asyncio.gather``, the first failure cancels the rest instead of
+    leaving them running unobserved, and it is re-raised as itself rather than
+    wrapped in an ``ExceptionGroup`` — so callers keep catching ``LLMError``.
+    """
+    try:
+        async with asyncio.TaskGroup() as group:
+            tasks = [group.create_task(coroutine) for coroutine in coroutines]
+    except BaseExceptionGroup as failures:
+        raise failures.exceptions[0]  # noqa: B904 - the group is only a wrapper
+    return [task.result() for task in tasks]
+
+
 async def run_content_generator_variants(
     *,
     llm: LLMClient,
@@ -106,10 +130,16 @@ async def run_content_generator_variants(
     instruction: str | None = None,
     prior_body: str | None = None,
     count: int = DEFAULT_VARIANT_COUNT,
+    semaphore: asyncio.Semaphore | None = None,
 ) -> list[GeneratedDraft]:
-    """Draft ``count`` ranked variants for one platform (3 ideas per request)."""
-    drafts: list[GeneratedDraft] = []
-    for style in CONTENT_VARIANT_STYLES[: max(1, count)]:
+    """Draft ``count`` ranked variants for one platform (3 ideas per request).
+
+    ``semaphore``, when given, caps how many provider calls are in flight — it
+    is shared across platforms by the service so one generation stays within
+    ``LLM_MAX_CONCURRENCY``.
+    """
+
+    async def draft(style: str) -> GeneratedDraft:
         context = build_generation_context(
             platform=platform,
             variant_style=style,
@@ -120,21 +150,25 @@ async def run_content_generator_variants(
             instruction=instruction,
             prior_body=prior_body,
         )
-        post = await llm.generate_social_post(context)
+        if semaphore is None:
+            post = await llm.generate_social_post(context)
+        else:
+            async with semaphore:
+                post = await llm.generate_social_post(context)
         violations = validate_generated_content(
             platform=platform,
             body=post.body,
             hashtags=list(post.hashtags),
             call_to_action=post.call_to_action,
         )
-        drafts.append(
-            GeneratedDraft(
-                style=style,
-                body=post.body,
-                hashtags=list(post.hashtags),
-                call_to_action=post.call_to_action,
-                context=context,
-                violation_count=len(violations),
-            )
+        return GeneratedDraft(
+            style=style,
+            body=post.body,
+            hashtags=list(post.hashtags),
+            call_to_action=post.call_to_action,
+            context=context,
+            violation_count=len(violations),
         )
+
+    drafts = await run_all(draft(style) for style in CONTENT_VARIANT_STYLES[: max(1, count)])
     return sorted(drafts, key=_rank_key)

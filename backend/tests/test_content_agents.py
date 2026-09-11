@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
+
 import pytest
 
 from app.agents.content_generator import (
@@ -12,7 +15,8 @@ from app.agents.content_generator import (
 )
 from app.agents.validation import validate_generated_content
 from app.db.enums import ContentPlatform
-from app.llm.client import MockLLMClient
+from app.llm.client import LLMError, MockLLMClient
+from tests.llm_fakes import SlowLLM
 
 
 def test_platform_profiles_cover_all_platforms() -> None:
@@ -73,6 +77,52 @@ async def test_mock_is_deterministic() -> None:
         return [d.body for d in drafts]
 
     assert await one() == await one()
+
+
+# ── Concurrency (docs/GENERATION-LATENCY-PLAN.md, phase 3) ──
+
+
+async def test_variants_are_generated_concurrently() -> None:
+    llm = SlowLLM(delay=0.3)
+
+    started = time.perf_counter()
+    drafts = await run_content_generator_variants(
+        llm=llm, platform=ContentPlatform.facebook, topic="Yoga"
+    )
+    elapsed = time.perf_counter() - started
+
+    assert len(drafts) == 3
+    assert llm.max_in_flight == 3
+    # One after another this is 0.9 s; together it is one call's worth.
+    assert elapsed < 0.6
+
+
+async def test_a_semaphore_bounds_the_variant_concurrency() -> None:
+    llm = SlowLLM(delay=0.05)
+
+    await run_content_generator_variants(
+        llm=llm,
+        platform=ContentPlatform.facebook,
+        topic="Yoga",
+        semaphore=asyncio.Semaphore(1),
+    )
+
+    assert llm.max_in_flight == 1
+
+
+async def test_a_failed_variant_surfaces_as_itself_and_cancels_the_rest() -> None:
+    llm = SlowLLM(delay=1.0, fail_style="direct", fail_delay=0.05)
+
+    started = time.perf_counter()
+    with pytest.raises(LLMError):
+        await run_content_generator_variants(
+            llm=llm, platform=ContentPlatform.facebook, topic="Yoga"
+        )
+    elapsed = time.perf_counter() - started
+
+    # The siblings were cancelled rather than left running to completion.
+    assert llm.completed == 0
+    assert elapsed < 0.5
 
 
 def test_validation_flags_all_violation_kinds() -> None:

@@ -4,19 +4,33 @@ Generation flow (plan §5): resolve course facts → best-effort reference fetch
 → 3 ranked variants per platform → persist as draft items sharing one
 ``generation_group`` + audit row. Workflow transitions go through
 ``assert_transition`` and always write audit rows.
+
+Every platform and variant is requested at once, and the whole of it runs
+under ``GENERATION_DEADLINE_SECONDS`` — below the ~120 s after which the
+production host kills the request with a 502. Nothing is written until every
+call has returned, so hitting the deadline leaves nothing half-saved
+(docs/GENERATION-LATENCY-PLAN.md).
 """
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import logging
+import time
 import uuid
+from collections.abc import Coroutine
+from typing import Any, TypeVar
 
 import httpx
 from bs4 import BeautifulSoup
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.content_generator import run_content_generator_variants
+from app.agents.content_generator import (
+    GeneratedDraft,
+    run_all,
+    run_content_generator_variants,
+)
 from app.audit import record_audit
 from app.config import Settings
 from app.content.repository import ContentRepository
@@ -31,6 +45,8 @@ logger = logging.getLogger(__name__)
 
 UPCOMING_OFFERINGS_IN_CONTEXT = 3
 
+T = TypeVar("T")
+
 
 class CourseNotFoundError(LookupError):
     pass
@@ -38,6 +54,28 @@ class CourseNotFoundError(LookupError):
 
 class ContentItemNotFoundError(LookupError):
     pass
+
+
+class GenerationTimeoutError(TimeoutError):
+    """A generation or regeneration ran past GENERATION_DEADLINE_SECONDS."""
+
+
+async def run_within_deadline(work: Coroutine[Any, Any, T], seconds: float) -> T:
+    """Await ``work``, cancelling it once ``seconds`` have passed.
+
+    Only the deadline itself becomes ``GenerationTimeoutError``: a
+    ``TimeoutError`` raised from inside ``work`` propagates as it was.
+    """
+    deadline = asyncio.timeout(seconds)
+    try:
+        async with deadline:
+            return await work
+    except TimeoutError as exc:
+        if deadline.expired():
+            raise GenerationTimeoutError(
+                f"Generation did not finish within {seconds:g} s."
+            ) from exc
+        raise
 
 
 async def fetch_reference_excerpt(
@@ -110,6 +148,7 @@ class ContentGenerationService:
         self, request: GenerateContentRequest, *, actor_id: uuid.UUID
     ) -> tuple[uuid.UUID, list[ContentItem], list[str]]:
         warnings: list[str] = []
+        started = time.perf_counter()
 
         course_facts: dict | None = None
         if request.course_id is not None:
@@ -119,27 +158,40 @@ class ContentGenerationService:
             offerings = await self._catalog.get_offerings(course.id)
             course_facts = build_course_facts(course, offerings)
 
-        reference_excerpt: str | None = None
-        if request.reference_url:
-            reference_excerpt, warning = await fetch_reference_excerpt(
-                request.reference_url, self._settings
+        # One semaphore for the whole generation, so LLM_MAX_CONCURRENCY caps
+        # the calls across every platform, not per platform.
+        semaphore = asyncio.Semaphore(self._settings.llm_max_concurrency)
+
+        async def draft_everything() -> list[list[GeneratedDraft]]:
+            reference_excerpt: str | None = None
+            if request.reference_url:
+                reference_excerpt, warning = await fetch_reference_excerpt(
+                    request.reference_url, self._settings
+                )
+                if warning:
+                    warnings.append(warning)
+            return await run_all(
+                run_content_generator_variants(
+                    llm=self._llm,
+                    platform=platform,
+                    topic=request.topic,
+                    notes=request.notes,
+                    course_facts=course_facts,
+                    reference_excerpt=reference_excerpt,
+                    semaphore=semaphore,
+                )
+                for platform in request.platforms
             )
-            if warning:
-                warnings.append(warning)
+
+        drafts_by_platform = await run_within_deadline(
+            draft_everything(), self._settings.generation_deadline_seconds
+        )
 
         generation_group = uuid.uuid4()
         items: list[ContentItem] = []
         generated_at = dt.datetime.now(dt.UTC).isoformat()
 
-        for platform in request.platforms:
-            drafts = await run_content_generator_variants(
-                llm=self._llm,
-                platform=platform,
-                topic=request.topic,
-                notes=request.notes,
-                course_facts=course_facts,
-                reference_excerpt=reference_excerpt,
-            )
+        for platform, drafts in zip(request.platforms, drafts_by_platform, strict=True):
             for draft in drafts:
                 items.append(
                     self._repo.add(
@@ -187,6 +239,16 @@ class ContentGenerationService:
             },
         )
         await self._session.commit()
+        # One line per generation, readable in the host's stderr.log: the first
+        # place to look if generations slow down again.
+        logger.info(
+            "Generated %d posts for %s in %.1f s (model=%s, reasoning_effort=%s)",
+            len(items),
+            ",".join(platform.value for platform in request.platforms),
+            time.perf_counter() - started,
+            "mock" if self._settings.llm_mock else self._settings.live_model_name,
+            self._settings.openai_reasoning_effort or "-",
+        )
         return generation_group, items, warnings
 
 
@@ -350,15 +412,18 @@ class ContentWorkflowService:
     ) -> ContentItem:
         """Guided regeneration: a fresh draft revising this item's body."""
         source = await self._get(item_id)
-        drafts = await run_content_generator_variants(
-            llm=self._llm,
-            platform=source.platform,
-            topic=source.topic,
-            notes=source.notes,
-            course_facts=(source.ai_metadata or {}).get("context", {}).get("course"),
-            instruction=instruction,
-            prior_body=source.edited_body or source.generated_body,
-            count=1,
+        drafts = await run_within_deadline(
+            run_content_generator_variants(
+                llm=self._llm,
+                platform=source.platform,
+                topic=source.topic,
+                notes=source.notes,
+                course_facts=(source.ai_metadata or {}).get("context", {}).get("course"),
+                instruction=instruction,
+                prior_body=source.edited_body or source.generated_body,
+                count=1,
+            ),
+            self._settings.generation_deadline_seconds,
         )
         draft = drafts[0]
         item = ContentItem(
