@@ -18,7 +18,16 @@ from app.llm.client import generate_with_retries
 
 
 class ImageGenerationError(RuntimeError):
-    """Raised when an image cannot be produced (provider or config)."""
+    """Raised when an image cannot be produced (provider or config).
+
+    Its message reaches the browser as the error detail, so it is written for
+    the person using the app, not for a log.
+    """
+
+
+IMAGE_UNAVAILABLE_MESSAGE = (
+    "The image could not be generated right now. Please try again in a minute."
+)
 
 
 class ImageClient(Protocol):
@@ -100,7 +109,7 @@ class OpenAIImageClient:
         except ImageGenerationError:
             raise
         except Exception as exc:
-            raise ImageGenerationError("Image generation failed after retries.") from exc
+            raise ImageGenerationError(IMAGE_UNAVAILABLE_MESSAGE) from exc
 
 
 def get_image_client(settings: Settings) -> ImageClient:
