@@ -27,11 +27,12 @@ export function middleware(request: NextRequest) {
 export const config = {
   // Exclude API paths: the backend enforces their auth and returns JSON 401s.
   // Redirecting them to the HTML login page would break the same-origin proxy.
-  // Public assets (the brand logo and any static image) are excluded too: the
-  // login page shows the logo to signed-out visitors, and the image optimiser
-  // fetches it without a session cookie — a redirect there serves HTML where
-  // the optimiser expects an image.
+  // Public assets (the brand logo, app icons, the web manifest and any static
+  // image) are excluded too: the login page shows them to signed-out visitors,
+  // and the image optimiser and the browser's install prompt fetch them
+  // without a session cookie — a redirect there serves HTML where they expect
+  // an image or JSON.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/|brand/|.*\\.(?:png|jpe?g|svg|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|api/|brand/|icons/|.*\\.(?:png|jpe?g|svg|webp|ico)$).*)",
   ],
 };

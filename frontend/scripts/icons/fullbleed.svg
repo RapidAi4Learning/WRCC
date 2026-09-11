@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Full-bleed variant of app/icon.svg for platforms that apply their own
+       mask (iOS home screen, Android maskable icons): a square background
+       and the artwork scaled to 78% so it stays inside the 80% safe zone. -->
+  <rect width="512" height="512" fill="#582281"/>
+  <g transform="translate(256 256) scale(0.78) translate(-256 -256)">
+    <path d="M156 112h200a72 72 0 0 1 72 72v112a72 72 0 0 1-72 72H236l-86 64 18-64h-12a72 72 0 0 1-72-72V184a72 72 0 0 1 72-72Z" fill="#aebd37"/>
+    <defs>
+      <path id="petal" d="M256 224C240 204 240 180 256 162 272 180 272 204 256 224Z"/>
+    </defs>
+    <g fill="#3a1656" transform="translate(0 -16)">
+      <use href="#petal"/>
+      <use href="#petal" transform="rotate(45 256 256)"/>
+      <use href="#petal" transform="rotate(90 256 256)"/>
+      <use href="#petal" transform="rotate(135 256 256)"/>
+      <use href="#petal" transform="rotate(180 256 256)"/>
+      <use href="#petal" transform="rotate(225 256 256)"/>
+      <use href="#petal" transform="rotate(270 256 256)"/>
+      <use href="#petal" transform="rotate(315 256 256)"/>
+      <circle cx="256" cy="256" r="16"/>
+    </g>
+  </g>
+</svg>
