@@ -8,6 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.content.preferences import WritingPreferences
 from app.db.enums import ContentPlatform
 
 # The speeds the Generate screen offers (docs/GENERATION-LATENCY-PLAN.md).
@@ -21,6 +22,7 @@ OfferedImageQuality = Literal["low", "medium"]
 
 
 class GenerateContentRequest(BaseModel):
+    writing_preferences: WritingPreferences = Field(default_factory=WritingPreferences)
     topic: str | None = Field(default=None, max_length=300)
     reference_url: str | None = Field(default=None, max_length=2000)
     notes: str | None = Field(default=None, max_length=2000)

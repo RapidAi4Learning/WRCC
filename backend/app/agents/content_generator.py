@@ -89,6 +89,7 @@ def build_generation_context(
     reference_excerpt: str | None = None,
     instruction: str | None = None,
     prior_body: str | None = None,
+    writing_preferences: dict | None = None,
 ) -> dict:
     """Pure assembly of the grounding context handed to the LLM."""
     return {
@@ -101,6 +102,7 @@ def build_generation_context(
         "reference_excerpt": reference_excerpt or None,
         "instruction": instruction or None,
         "prior_body": prior_body or None,
+        "writing_preferences": writing_preferences or {},
     }
 
 
@@ -136,6 +138,7 @@ async def run_content_generator_variants(
     prior_body: str | None = None,
     count: int = DEFAULT_VARIANT_COUNT,
     semaphore: asyncio.Semaphore | None = None,
+    writing_preferences: dict | None = None,
 ) -> list[GeneratedDraft]:
     """Draft ``count`` ranked variants for one platform (3 ideas per request).
 
@@ -154,6 +157,7 @@ async def run_content_generator_variants(
             reference_excerpt=reference_excerpt,
             instruction=instruction,
             prior_body=prior_body,
+            writing_preferences=writing_preferences,
         )
         if semaphore is None:
             post = await llm.generate_social_post(context)

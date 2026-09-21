@@ -11,6 +11,35 @@ import app.content.service as content_service
 from app.db.models import Course, CourseOffering
 
 
+async def test_writing_preferences_survive_generation_and_regeneration(auth_client: AsyncClient):
+    preferences = {"tone": "friendly", "format": "bullet_points", "emojis": "none"}
+    response = await auth_client.post(
+        "/api/content/generate",
+        json={"topic": "Learning", "platforms": ["instagram"], "writing_preferences": preferences},
+    )
+    assert response.status_code == 200, response.text
+    for item in response.json()["items"]:
+        assert item["ai_metadata"]["context"]["writing_preferences"] == preferences
+    item = response.json()["items"][0]
+    regenerated = await auth_client.post(
+        f"/api/content/{item['id']}/regenerate", json={"instruction": "Focus on practical skills"}
+    )
+    assert regenerated.status_code == 200, regenerated.text
+    assert regenerated.json()["ai_metadata"]["context"]["writing_preferences"] == preferences
+
+
+@pytest.mark.parametrize("field", ["tone", "format", "emojis"])
+async def test_unknown_writing_preferences_are_rejected(auth_client: AsyncClient, field: str):
+    response = await auth_client.post(
+        "/api/content/generate",
+        json={
+            "topic": "Learning", "platforms": ["facebook"],
+            "writing_preferences": {field: "invalid"},
+        },
+    )
+    assert response.status_code == 422
+
+
 async def _seed_course(db_sessionmaker) -> str:
     async with db_sessionmaker() as session:
         course = Course(

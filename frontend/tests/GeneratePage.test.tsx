@@ -38,6 +38,31 @@ async function generate(): Promise<Record<string, unknown>> {
   return mockGenerate.mock.calls[0][0];
 }
 
+describe("Generate — writing preferences", () => {
+  it("sends selected preferences and remembers them for the next visit", async () => {
+    const view = render(<GeneratePage />);
+    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "friendly" } });
+    fireEvent.change(screen.getByLabelText("Post format"), { target: { value: "bullet_points" } });
+    fireEvent.change(screen.getByLabelText("Emojis"), { target: { value: "none" } });
+    expect((await generate()).writing_preferences).toEqual({
+      tone: "friendly", format: "bullet_points", emojis: "none",
+    });
+    view.unmount();
+    render(<GeneratePage />);
+    expect(screen.getByLabelText("Tone")).toHaveValue("friendly");
+    expect(screen.getByLabelText("Post format")).toHaveValue("bullet_points");
+    expect(screen.getByLabelText("Emojis")).toHaveValue("none");
+  });
+
+  it("defaults to the platform when saved preferences are invalid", async () => {
+    window.localStorage.setItem("wrcc.generate.emojis", "invalid");
+    render(<GeneratePage />);
+    expect((await generate()).writing_preferences).toEqual({
+      tone: "auto", format: "auto", emojis: "auto",
+    });
+  });
+});
+
 describe("Generate — writing speed", () => {
   it("offers three speeds, with Balanced chosen by default", () => {
     render(<GeneratePage />);

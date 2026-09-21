@@ -14,6 +14,7 @@ import type {
   GenerateContentResult,
   Platform,
   ReasoningEffort,
+  WritingPreferences,
 } from "@/types/content";
 import type { Course } from "@/types/course";
 import CoursePicker from "@/components/content/CoursePicker";
@@ -28,6 +29,7 @@ import {
   Field,
   PageHeader,
   SectionLabel,
+  Select,
   SegmentedControl,
   Skeleton,
   Tab,
@@ -55,7 +57,14 @@ const SPEEDS: ReadonlyArray<{ value: ReasoningEffort; label: string; hint: strin
 ];
 const SPEED_VALUES = SPEEDS.map((speed) => speed.value);
 
+const TONES: WritingPreferences["tone"][] = ["auto", "professional", "friendly", "energetic", "inspiring"];
+const FORMATS: WritingPreferences["format"][] = ["auto", "paragraphs", "bullet_points", "story"];
+const EMOJIS: WritingPreferences["emojis"][] = ["auto", "none", "light", "expressive"];
+
 export default function GeneratePage() {
+  const [tone, setTone] = useStoredChoice("wrcc.generate.tone", TONES, "auto");
+  const [format, setFormat] = useStoredChoice("wrcc.generate.format", FORMATS, "auto");
+  const [emojis, setEmojis] = useStoredChoice("wrcc.generate.emojis", EMOJIS, "auto");
   const [course, setCourse] = useState<Course | null>(null);
   const [topic, setTopic] = useState("");
   const [referenceUrl, setReferenceUrl] = useState("");
@@ -95,6 +104,7 @@ export default function GeneratePage() {
         course_id: course?.id,
         platforms,
         reasoning_effort: speed,
+        writing_preferences: { tone, format, emojis },
       });
       setResult(generated);
       setActivePlatform(generated.items[0]?.platform ?? null);
@@ -254,7 +264,7 @@ export default function GeneratePage() {
                 id="notes"
                 rows={3}
                 icon={<FileText size={20} />}
-                placeholder="Anything the posts must mention"
+                placeholder="Details to include, words to avoid, or a specific approach"
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
               />
@@ -281,6 +291,38 @@ export default function GeneratePage() {
                 </ToggleChip>
               ))}
             </div>
+          </fieldset>
+
+          <hr className={styles.divider} />
+          <fieldset className={styles.fieldset} disabled={isGenerating}>
+            <SectionLabel as="legend" step={3} size="sm" tone="brand" className={styles.legend}>
+              Writing style
+            </SectionLabel>
+            <Field label="Tone" htmlFor="writing-tone">
+              <Select id="writing-tone" value={tone} onChange={(event) => setTone(event.target.value as WritingPreferences["tone"])}>
+                <option value="auto">Match the platform</option>
+                <option value="professional">Professional</option>
+                <option value="friendly">Friendly &amp; conversational</option>
+                <option value="energetic">Energetic</option>
+                <option value="inspiring">Inspiring</option>
+              </Select>
+            </Field>
+            <Field label="Post format" htmlFor="writing-format">
+              <Select id="writing-format" value={format} onChange={(event) => setFormat(event.target.value as WritingPreferences["format"])}>
+                <option value="auto">Match the platform</option>
+                <option value="paragraphs">Short paragraphs</option>
+                <option value="bullet_points">Bullet points</option>
+                <option value="story">Storytelling</option>
+              </Select>
+            </Field>
+            <Field label="Emojis" htmlFor="writing-emojis">
+              <Select id="writing-emojis" value={emojis} onChange={(event) => setEmojis(event.target.value as WritingPreferences["emojis"])}>
+                <option value="auto">Match the platform</option>
+                <option value="none">No emojis</option>
+                <option value="light">A few (1–2)</option>
+                <option value="expressive">Expressive (3–5)</option>
+              </Select>
+            </Field>
           </fieldset>
 
           <SegmentedControl

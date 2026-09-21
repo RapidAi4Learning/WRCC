@@ -15,8 +15,39 @@ from app.agents.content_generator import (
 )
 from app.agents.validation import validate_generated_content
 from app.db.enums import ContentPlatform
-from app.llm.client import LLMError, MockLLMClient
+from app.llm.client import LLMError, MockLLMClient, _render_prompt
 from tests.llm_fakes import SlowLLM
+
+
+def test_explicit_preferences_override_platform_defaults_in_live_prompt() -> None:
+    context = build_generation_context(
+        platform=ContentPlatform.instagram,
+        variant_style="direct",
+        topic="Learning new skills",
+        writing_preferences={"tone": "professional", "format": "bullet_points", "emojis": "none"},
+    )
+    prompt = _render_prompt(context)
+    assert "Professional, clear and confident" in prompt
+    assert "plain-text bullets" in prompt
+    assert "Use no emojis anywhere" in prompt
+    assert "override the default platform" in prompt
+    assert "do not state prices" in prompt
+
+
+@pytest.mark.parametrize(
+    "mode, expected", [("none", ""), ("light", "📚"), ("expressive", "📚 ✨ 🌱")]
+)
+async def test_mock_uses_selected_emoji_level_and_format(mode, expected) -> None:
+    drafts = await run_content_generator_variants(
+        llm=MockLLMClient(), platform=ContentPlatform.instagram, topic="Learning",
+        writing_preferences={"tone": "friendly", "format": "bullet_points", "emojis": mode},
+    )
+    for draft in drafts:
+        assert "\n- " in draft.body
+        if expected:
+            assert draft.body.startswith(expected)
+        else:
+            assert "📚" not in draft.body and "✨" not in draft.body
 
 
 def test_platform_profiles_cover_all_platforms() -> None:

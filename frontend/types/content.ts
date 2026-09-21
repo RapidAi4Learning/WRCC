@@ -35,6 +35,12 @@ export interface ContentItem {
 // these; "high" is not offered (see docs/GENERATION-LATENCY-PLAN.md).
 export type ReasoningEffort = "minimal" | "low" | "medium";
 
+export interface WritingPreferences {
+  tone: "auto" | "professional" | "friendly" | "energetic" | "inspiring";
+  format: "auto" | "paragraphs" | "bullet_points" | "story";
+  emojis: "auto" | "none" | "light" | "expressive";
+}
+
 export interface GenerateContentInput {
   topic?: string;
   reference_url?: string;
@@ -43,6 +49,7 @@ export interface GenerateContentInput {
   platforms: Platform[];
   // Absent keeps the server's OPENAI_REASONING_EFFORT.
   reasoning_effort?: ReasoningEffort;
+  writing_preferences?: WritingPreferences;
 }
 
 export interface GenerateContentResult {

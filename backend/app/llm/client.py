@@ -18,6 +18,7 @@ from typing import Any, Protocol, TypeVar
 from pydantic import BaseModel, Field
 
 from app.config import Settings
+from app.content.preferences import writing_guidance
 
 logger = logging.getLogger(__name__)
 
@@ -108,11 +109,22 @@ class MockLLMClient:
         profile = context.get("platform_profile") or {}
         platform = str(context.get("platform") or "facebook")
         style = str(context.get("variant_style") or "direct")
+        preferences = context.get("writing_preferences") or {}
 
         subject = course.get("title") or context.get("topic") or "our courses"
         opener = _STYLE_OPENERS.get(style, _STYLE_OPENERS["direct"]).format(
             subject=subject
         )
+        tone_intro = {
+            "professional": "Develop your skills with confidence.",
+            "friendly": "Let's take the next step together.",
+            "energetic": "Ready, set, learn!",
+            "inspiring": "Your next chapter starts with a new skill.",
+        }.get(preferences.get("tone"), "")
+        if preferences.get("format") == "story":
+            opener = f"Imagine making time to learn {subject}. {opener}"
+        if tone_intro:
+            opener = f"{tone_intro} {opener}"
 
         parts = [opener]
         if context.get("instruction"):
@@ -131,9 +143,21 @@ class MockLLMClient:
                 parts.append(f"Course fee: ${first['price']:.0f}.")
         if context.get("reference_excerpt"):
             parts.append("More details on our website.")
-        parts.append(_PLATFORM_FLAVOUR.get(platform, ""))
+        flavour = _PLATFORM_FLAVOUR.get(platform, "")
+        emoji_mode = preferences.get("emojis", "auto")
+        if emoji_mode != "auto":
+            flavour = flavour.replace("📚✨", "").strip()
+        if emoji_mode == "light":
+            parts[0] = "📚 " + parts[0]
+        elif emoji_mode == "expressive":
+            parts[0] = "📚 ✨ 🌱 " + parts[0]
+        parts.append(flavour)
 
-        body = " ".join(part for part in parts if part).strip()
+        separator = "\n\n" if preferences.get("format") in {"paragraphs", "story"} else " "
+        if preferences.get("format") == "bullet_points":
+            body = parts[0] + "\n\n" + "\n".join(f"- {part}" for part in parts[1:] if part)
+        else:
+            body = separator.join(part for part in parts if part).strip()
 
         min_length = int(profile.get("min_length") or 0)
         max_length = int(profile.get("max_length") or 2000)
@@ -246,6 +270,15 @@ def _render_prompt(context: dict) -> str:
     ]
     if context.get("topic"):
         lines.append(f"Topic: {context['topic']}")
+    preferences = writing_guidance(context.get("writing_preferences"))
+    if preferences:
+        lines.append(
+            "Selected writing preferences override the default platform tone, structure "
+            "and emoji suggestions. Keep platform length limits and factual grounding. "
+            "Keep this variant's angle distinct within the selected format. "
+            "An explicit revision instruction may change these preferences for this revision."
+        )
+        lines.extend(f"- {preference}" for preference in preferences)
     if context.get("notes"):
         lines.append(f"Extra notes from the marketer: {context['notes']}")
     if context.get("course"):

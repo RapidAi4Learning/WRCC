@@ -186,6 +186,7 @@ class ContentGenerationService:
                     platform=platform,
                     topic=request.topic,
                     notes=request.notes,
+                    writing_preferences=request.writing_preferences.model_dump(),
                     course_facts=course_facts,
                     reference_excerpt=reference_excerpt,
                     semaphore=semaphore,
@@ -434,6 +435,9 @@ class ContentWorkflowService:
                 course_facts=(source.ai_metadata or {}).get("context", {}).get("course"),
                 instruction=instruction,
                 prior_body=source.edited_body or source.generated_body,
+                writing_preferences=(source.ai_metadata or {}).get("context", {}).get(
+                    "writing_preferences"
+                ),
                 count=1,
             ),
             self._settings.generation_deadline_seconds,
