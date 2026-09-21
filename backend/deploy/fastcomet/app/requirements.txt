@@ -1,7 +1,7 @@
 # Runtime dependencies for the FastComet deployment.
 #
-# Mirrors [project.dependencies] in pyproject.toml, plus the one thing only
-# this deployment needs. Kept as a flat file because cPanel's "Run Pip Install"
+# Mirrors [project.dependencies] in pyproject.toml, plus hosting dependencies.
+# Kept as a flat file because cPanel's "Run Pip Install"
 # button reads requirements.txt and nothing else.
 #
 # If pyproject.toml gains a dependency, add it here too -- there is no import
@@ -24,8 +24,12 @@ google-genai>=1.0
 openai>=1.60
 
 # Passenger speaks WSGI; the application is ASGI. This is the bridge, and it
-# is the only dependency that exists solely because of this host.
+# is required specifically by this host.
 a2wsgi>=1.10
+
+# cPanel's preinstalled wheel requires packaging, but this environment was
+# provisioned without it. Install it before the deployment's pip check.
+packaging
 
 # uvicorn is deliberately absent. It is the server for local development and
 # for the Docker image; here Passenger is the server, and installing a second
