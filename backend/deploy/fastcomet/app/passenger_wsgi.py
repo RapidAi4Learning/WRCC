@@ -57,6 +57,13 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
 LOG_PATH = os.path.join(HERE, "startup_error.log")
+# Read once at process startup: a health check must not mistake an old worker
+# reading newly uploaded files for a worker that actually loaded the release.
+try:
+    with open(os.path.join(HERE, ".deploy-release"), encoding="utf-8") as handle:
+        _release = handle.read().strip()
+except FileNotFoundError:
+    _release = "manual"
 
 
 def _failure_page(summary: str, detail: str):
@@ -176,9 +183,12 @@ try:
         return _bridge
 
     def application(environ, start_response):
+        def with_release(status, headers, exc_info=None):
+            return start_response(status, [*headers, ("X-WRCC-Release", _release)], exc_info)
+
         if environ.get("PATH_INFO") == "/__wsgi_ping":
-            return _pong(environ, start_response)
-        return _get_bridge()(environ, start_response)
+            return _pong(environ, with_release)
+        return _get_bridge()(environ, with_release)
 
 except BaseException as exc:  # noqa: BLE001 - `application` MUST get defined
     # BaseException, not Exception: a SystemExit raised by a misconfigured

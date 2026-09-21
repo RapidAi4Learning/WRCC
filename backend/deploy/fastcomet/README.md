@@ -1,5 +1,8 @@
 # Deploying the WRCC backend to FastComet
 
+For subsequent updates via SSH / GitHub Actions, see
+[Automated deployment](AUTOMATION.md). The instructions below cover initial setup.
+
 Shared cPanel hosting, PostgreSQL 13, Passenger. A fresh database — no data is
 carried over from anywhere.
 

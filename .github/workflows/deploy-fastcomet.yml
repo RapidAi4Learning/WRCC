@@ -1,0 +1,51 @@
+name: Deploy backend to FastComet
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fastcomet-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: fastcomet-production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check deployment scripts
+        run: |
+          bash -n backend/deploy/fastcomet/deploy.sh
+          bash -n backend/deploy/fastcomet/deploy-remote.sh
+          bash backend/deploy/fastcomet/test-deploy.sh
+          python3 backend/deploy/fastcomet/test_passenger_release.py
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.FASTCOMET_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.FASTCOMET_SSH_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Transfer, install, migrate and restart
+        env:
+          FASTCOMET_HOST: ${{ vars.FASTCOMET_HOST }}
+          FASTCOMET_USER: ${{ vars.FASTCOMET_USER }}
+          FASTCOMET_PORT: ${{ vars.FASTCOMET_PORT }}
+          FASTCOMET_APP_ROOT: ${{ vars.FASTCOMET_APP_ROOT }}
+          FASTCOMET_PYTHON: ${{ vars.FASTCOMET_PYTHON }}
+          FASTCOMET_HEALTH_URL: ${{ vars.FASTCOMET_HEALTH_URL }}
+        run: bash backend/deploy/fastcomet/deploy.sh
+      - name: Remove SSH credentials
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519 ~/.ssh/known_hosts
