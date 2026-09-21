@@ -41,6 +41,8 @@ async function generate(): Promise<Record<string, unknown>> {
 describe("Generate — writing preferences", () => {
   it("sends selected preferences and remembers them for the next visit", async () => {
     const view = render(<GeneratePage />);
+    fireEvent.click(screen.getByRole("button", { name: /Advanced settings/ }));
+    fireEvent.click(screen.getByRole("switch", { name: "Use custom writing style" }));
     fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "friendly" } });
     fireEvent.change(screen.getByLabelText("Post format"), { target: { value: "bullet_points" } });
     fireEvent.change(screen.getByLabelText("Emojis"), { target: { value: "none" } });
@@ -49,6 +51,10 @@ describe("Generate — writing preferences", () => {
     });
     view.unmount();
     render(<GeneratePage />);
+    expect(screen.getByRole("button", { name: /Advanced settings/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("Custom style on")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Advanced settings/ }));
+    expect(screen.getByRole("switch")).toBeChecked();
     expect(screen.getByLabelText("Tone")).toHaveValue("friendly");
     expect(screen.getByLabelText("Post format")).toHaveValue("bullet_points");
     expect(screen.getByLabelText("Emojis")).toHaveValue("none");
@@ -56,9 +62,43 @@ describe("Generate — writing preferences", () => {
 
   it("defaults to the platform when saved preferences are invalid", async () => {
     window.localStorage.setItem("wrcc.generate.emojis", "invalid");
+    window.localStorage.setItem("wrcc.generate.styleEnabled", "on");
     render(<GeneratePage />);
     expect((await generate()).writing_preferences).toEqual({
       tone: "auto", format: "auto", emojis: "auto",
+    });
+  });
+
+  it("starts collapsed and generates without custom preferences by default", async () => {
+    render(<GeneratePage />);
+    expect(screen.getByRole("button", { name: /Advanced settings/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByLabelText("Tone")).not.toBeInTheDocument();
+    expect(await generate()).not.toHaveProperty("writing_preferences");
+  });
+
+  it("turns preferences off without losing them and restores them when enabled again", async () => {
+    window.localStorage.setItem("wrcc.generate.styleEnabled", "on");
+    window.localStorage.setItem("wrcc.generate.tone", "friendly");
+    window.localStorage.setItem("wrcc.generate.emojis", "none");
+    const view = render(<GeneratePage />);
+    fireEvent.click(screen.getByRole("button", { name: /Advanced settings/ }));
+    fireEvent.click(screen.getByRole("switch"));
+    expect(screen.getByLabelText("Tone")).toBeDisabled();
+    expect(await generate()).not.toHaveProperty("writing_preferences");
+    await waitFor(() => expect(screen.getByRole("button", { name: /Generate 3 ideas/ })).toBeEnabled());
+    view.unmount();
+
+    render(<GeneratePage />);
+    fireEvent.click(screen.getByRole("button", { name: /Advanced settings/ }));
+    expect(screen.getByRole("switch")).not.toBeChecked();
+    expect(screen.getByLabelText("Tone")).toHaveValue("friendly");
+    expect(screen.getByLabelText("Emojis")).toHaveValue("none");
+    fireEvent.click(screen.getByRole("switch"));
+    // Collapsing the panel doesn't turn the saved style off.
+    fireEvent.click(screen.getByRole("button", { name: /Advanced settings/ }));
+    mockGenerate.mockClear();
+    expect((await generate()).writing_preferences).toEqual({
+      tone: "friendly", format: "auto", emojis: "none",
     });
   });
 });

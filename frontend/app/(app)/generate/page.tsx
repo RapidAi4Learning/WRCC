@@ -60,8 +60,14 @@ const SPEED_VALUES = SPEEDS.map((speed) => speed.value);
 const TONES: WritingPreferences["tone"][] = ["auto", "professional", "friendly", "energetic", "inspiring"];
 const FORMATS: WritingPreferences["format"][] = ["auto", "paragraphs", "bullet_points", "story"];
 const EMOJIS: WritingPreferences["emojis"][] = ["auto", "none", "light", "expressive"];
+const STYLE_MODES = ["off", "on"] as const;
 
 export default function GeneratePage() {
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [styleMode, setStyleMode] = useStoredChoice(
+    "wrcc.generate.styleEnabled", STYLE_MODES, "off",
+  );
+  const useCustomStyle = styleMode === "on";
   const [tone, setTone] = useStoredChoice("wrcc.generate.tone", TONES, "auto");
   const [format, setFormat] = useStoredChoice("wrcc.generate.format", FORMATS, "auto");
   const [emojis, setEmojis] = useStoredChoice("wrcc.generate.emojis", EMOJIS, "auto");
@@ -104,7 +110,7 @@ export default function GeneratePage() {
         course_id: course?.id,
         platforms,
         reasoning_effort: speed,
-        writing_preferences: { tone, format, emojis },
+        ...(useCustomStyle ? { writing_preferences: { tone, format, emojis } } : {}),
       });
       setResult(generated);
       setActivePlatform(generated.items[0]?.platform ?? null);
@@ -294,36 +300,71 @@ export default function GeneratePage() {
           </fieldset>
 
           <hr className={styles.divider} />
-          <fieldset className={styles.fieldset} disabled={isGenerating}>
-            <SectionLabel as="legend" step={3} size="sm" tone="brand" className={styles.legend}>
-              Writing style
-            </SectionLabel>
-            <Field label="Tone" htmlFor="writing-tone">
-              <Select id="writing-tone" value={tone} onChange={(event) => setTone(event.target.value as WritingPreferences["tone"])}>
-                <option value="auto">Match the platform</option>
-                <option value="professional">Professional</option>
-                <option value="friendly">Friendly &amp; conversational</option>
-                <option value="energetic">Energetic</option>
-                <option value="inspiring">Inspiring</option>
-              </Select>
-            </Field>
-            <Field label="Post format" htmlFor="writing-format">
-              <Select id="writing-format" value={format} onChange={(event) => setFormat(event.target.value as WritingPreferences["format"])}>
-                <option value="auto">Match the platform</option>
-                <option value="paragraphs">Short paragraphs</option>
-                <option value="bullet_points">Bullet points</option>
-                <option value="story">Storytelling</option>
-              </Select>
-            </Field>
-            <Field label="Emojis" htmlFor="writing-emojis">
-              <Select id="writing-emojis" value={emojis} onChange={(event) => setEmojis(event.target.value as WritingPreferences["emojis"])}>
-                <option value="auto">Match the platform</option>
-                <option value="none">No emojis</option>
-                <option value="light">A few (1–2)</option>
-                <option value="expressive">Expressive (3–5)</option>
-              </Select>
-            </Field>
-          </fieldset>
+          <div className={styles.advanced}>
+            <button
+              type="button"
+              className={styles.advancedToggle}
+              aria-expanded={advancedOpen}
+              aria-controls="advanced-writing-settings"
+              onClick={() => setAdvancedOpen((open) => !open)}
+            >
+              <span>Advanced settings</span>
+              <span className={styles.advancedStatus}>
+                {useCustomStyle ? "Custom style on" : "Automatic style"}
+                <span aria-hidden="true">{advancedOpen ? " −" : " +"}</span>
+              </span>
+            </button>
+            {advancedOpen ? (
+              <div id="advanced-writing-settings" className={styles.advancedBody}>
+                <ToggleChip
+                  role="switch"
+                  checked={useCustomStyle}
+                  disabled={isGenerating}
+                  onChange={(event) => setStyleMode(event.target.checked ? "on" : "off")}
+                  aria-describedby="writing-style-help"
+                >
+                  Use custom writing style
+                </ToggleChip>
+                <p id="writing-style-help" className={styles.advancedHelp}>
+                  {useCustomStyle
+                    ? "Your saved choices apply to new posts. Turn off to use each platform's default style."
+                    : "Posts use each platform's default style. Your choices below stay saved for next time."}
+                  {" "}Remembered in this browser.
+                </p>
+                <fieldset className={styles.fieldset} disabled={isGenerating || !useCustomStyle}>
+                  <SectionLabel as="legend" size="sm" tone="brand" className={styles.legend}>
+                    Writing style
+                  </SectionLabel>
+                  <Field label="Tone" htmlFor="writing-tone">
+                    <Select id="writing-tone" value={tone} onChange={(event) => setTone(event.target.value as WritingPreferences["tone"])}>
+                      <option value="auto">Match the platform</option>
+                      <option value="professional">Professional</option>
+                      <option value="friendly">Friendly &amp; conversational</option>
+                      <option value="energetic">Energetic</option>
+                      <option value="inspiring">Inspiring</option>
+                    </Select>
+                  </Field>
+                  <Field label="Post format" htmlFor="writing-format">
+                    <Select id="writing-format" value={format} onChange={(event) => setFormat(event.target.value as WritingPreferences["format"])}>
+                      <option value="auto">Match the platform</option>
+                      <option value="paragraphs">Short paragraphs</option>
+                      <option value="bullet_points">Bullet points</option>
+                      <option value="story">Storytelling</option>
+                    </Select>
+                  </Field>
+                  <Field label="Emojis" htmlFor="writing-emojis">
+                    <Select id="writing-emojis" value={emojis} onChange={(event) => setEmojis(event.target.value as WritingPreferences["emojis"])}>
+                      <option value="auto">Match the platform</option>
+                      <option value="none">No emojis</option>
+                      <option value="light">A few (1–2)</option>
+                      <option value="expressive">Expressive (3–5)</option>
+                    </Select>
+                  </Field>
+                </fieldset>
+
+              </div>
+            ) : null}
+          </div>
 
           <SegmentedControl
             label="Writing speed"
