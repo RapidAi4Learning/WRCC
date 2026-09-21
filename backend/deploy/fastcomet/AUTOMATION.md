@@ -46,6 +46,20 @@ cierra al terminar el job. También se admiten claves sin passphrase.
 Si el desbloqueo falla, el despliegue se detiene antes de conectar al servidor.
 Esto utiliza el mecanismo de [OpenSSH ssh-add](https://man.openbsd.org/ssh-add).
 
+### Si aparece Permission denied
+
+Ejecutar un **Run workflow nuevo** sobre la rama que contiene estos cambios.
+Reintentar un run anterior no incorpora cambios de código posteriores.
+El paso **Verify SSH authentication** imprime el commit, el puerto y la huella
+pública de la clave cargada; también registra qué clave ofrece SSH al servidor.
+No imprime la clave privada ni la passphrase. Se detiene antes de transferir
+archivos si no puede autenticarse y ejecutar un comando remoto.
+
+Si la clave está cargada y el servidor la rechaza, comprobar que su clave pública
+esté **Authorized** en cPanel para `FASTCOMET_USER`. No basta con importarla.
+La clave autorizada debe corresponder a la privada del secret de GitHub.
+Si no hay claves cargadas, revisar el paso **Configure SSH** y el commit del run.
+
 El servidor debe tener `.env` en Application root, con `APP_ENV=production`,
 `DATABASE_URL` y la configuración completa de producción. Las variables de
 **Setup Python App** no se heredan al abrir SSH: deben coincidir con este archivo

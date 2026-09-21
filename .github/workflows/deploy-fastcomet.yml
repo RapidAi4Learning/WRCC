@@ -39,6 +39,27 @@ jobs:
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
           bash backend/deploy/fastcomet/load-ssh-key.sh
+      - name: Verify SSH authentication
+        env:
+          FASTCOMET_HOST: ${{ vars.FASTCOMET_HOST }}
+          FASTCOMET_USER: ${{ vars.FASTCOMET_USER }}
+          FASTCOMET_PORT: ${{ vars.FASTCOMET_PORT }}
+        run: |
+          echo "Workflow commit: $GITHUB_SHA"
+          test -n "$FASTCOMET_HOST"
+          test -n "$FASTCOMET_USER"
+          if ! ssh-add -l; then
+            echo '::error::No unlocked key is available in the SSH agent.'
+            exit 1
+          fi
+          echo "Checking SSH access to $FASTCOMET_USER@$FASTCOMET_HOST on port ${FASTCOMET_PORT:-17177}"
+          if ! ssh -v -p "${FASTCOMET_PORT:-17177}" -o BatchMode=yes \
+            -o PreferredAuthentications=publickey -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=20 "$FASTCOMET_USER@$FASTCOMET_HOST" \
+            'printf "SSH authentication and remote commands OK\n"'; then
+            echo '::error::SSH preflight failed. Review the offered public-key fingerprint above and verify that its matching public key is Authorized for this cPanel user.'
+            exit 1
+          fi
       - name: Transfer, install, migrate and restart
         env:
           FASTCOMET_HOST: ${{ vars.FASTCOMET_HOST }}
