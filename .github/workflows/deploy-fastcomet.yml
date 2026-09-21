@@ -26,17 +26,19 @@ jobs:
           bash -n backend/deploy/fastcomet/deploy-remote.sh
           bash backend/deploy/fastcomet/test-deploy.sh
           python3 backend/deploy/fastcomet/test_passenger_release.py
+          bash backend/deploy/fastcomet/test-ssh-key.sh
       - name: Configure SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.FASTCOMET_SSH_PRIVATE_KEY }}
+          SSH_KEY_PASSPHRASE: ${{ secrets.FASTCOMET_SSH_PASSPHRASE }}
           SSH_KNOWN_HOSTS: ${{ secrets.FASTCOMET_SSH_KNOWN_HOSTS }}
         run: |
           test -n "$SSH_PRIVATE_KEY"
           test -n "$SSH_KNOWN_HOSTS"
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          bash backend/deploy/fastcomet/load-ssh-key.sh
       - name: Transfer, install, migrate and restart
         env:
           FASTCOMET_HOST: ${{ vars.FASTCOMET_HOST }}
@@ -48,4 +50,8 @@ jobs:
         run: bash backend/deploy/fastcomet/deploy.sh
       - name: Remove SSH credentials
         if: always()
-        run: rm -f ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+        run: |
+          if [[ -n "${SSH_AGENT_PID:-}" ]]; then
+            ssh-agent -k >/dev/null 2>&1 || true
+          fi
+          rm -f ~/.ssh/known_hosts

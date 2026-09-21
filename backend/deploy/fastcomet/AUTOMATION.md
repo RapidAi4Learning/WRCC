@@ -17,7 +17,7 @@ Crear el environment **fastcomet-production** en GitHub y añadir estas variable
 |---|---|
 | `FASTCOMET_HOST` | Host SSH del servidor, sin `https://` |
 | `FASTCOMET_USER` | Usuario cPanel |
-| `FASTCOMET_PORT` | Puerto SSH; por defecto `17177` |
+| `FASTCOMET_PORT` | En esta cuenta, configurar `22`; el script usa `17177` si se omite |
 | `FASTCOMET_APP_ROOT` | Ruta absoluta de Application root; copiar la real de cPanel |
 | `FASTCOMET_PYTHON` | Ruta absoluta al `bin/python` del entorno virtual de la aplicación |
 | `FASTCOMET_HEALTH_URL` | `https://api.social-media-marketing.ai4l.com.au/api/health/ready` (sin query string) |
@@ -30,12 +30,21 @@ Añadir estos **secrets** en el mismo environment:
 
 | Secret | Contenido |
 |---|---|
-| `FASTCOMET_SSH_PRIVATE_KEY` | Clave privada dedicada al despliegue, sin passphrase; autorizar su clave pública en cPanel |
+| `FASTCOMET_SSH_PRIVATE_KEY` | Bloque completo de la clave privada dedicada al despliegue; autorizar su clave pública en cPanel |
+| `FASTCOMET_SSH_PASSPHRASE` | Passphrase de esa clave; omitir si la clave no está cifrada |
 | `FASTCOMET_SSH_KNOWN_HOSTS` | Entrada verificada de `known_hosts`, incluyendo `[HOST]:PUERTO` si el puerto no es 22 |
 
-Obtener la clave del host con `ssh-keyscan -p 17177 HOST` y verificar su huella
+Obtener la clave del host con `ssh-keyscan -p 22 HOST` y verificar su huella
 con FastComet o con una conexión de confianza antes de guardarla. El script exige
 `StrictHostKeyChecking=yes`; no acepta automáticamente un host desconocido.
+
+El workflow desbloquea la clave mediante `SSH_ASKPASS` y la carga en un agente SSH
+temporal durante un máximo de 30 minutos. La passphrase solo está disponible en
+el paso de configuración; no se escribe en archivos ni se pasa como argumento.
+El archivo temporal de la clave se elimina después de cargarla y el agente se
+cierra al terminar el job. También se admiten claves sin passphrase.
+Si el desbloqueo falla, el despliegue se detiene antes de conectar al servidor.
+Esto utiliza el mecanismo de [OpenSSH ssh-add](https://man.openbsd.org/ssh-add).
 
 El servidor debe tener `.env` en Application root, con `APP_ENV=production`,
 `DATABASE_URL` y la configuración completa de producción. Las variables de
